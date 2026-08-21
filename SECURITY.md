@@ -30,4 +30,4 @@ Taking ownership can break application servicing or Windows security descriptors
 
 ## N10Store boundary
 
-The preserved N10Store executable contains a curated mapping from short slugs to exact Chocolatey package IDs. User input cannot become an executable name, package source, or arbitrary command. Package operations call the fixed bundled `Tools\\choco\\choco.exe`; `--dry-run` performs no network or package action. Package trust, manifests, hashes, and installer behavior remain governed by Chocolatey and the selected third-party package publisher.
+N10Store contains a curated mapping from short slugs to exact Chocolatey package IDs. User input cannot become an executable name, package source, or arbitrary command. Package operations call the fixed bundled `Tools\\choco\\choco.exe`; `--dry-run` performs no network or package action. Store data is restricted to its fixed NebulaData cache/download roots, and Clear Store Cache refuses reparse points or paths outside that root. Package trust, manifests, hashes, and installer behavior remain governed by Chocolatey and the selected third-party package publisher.

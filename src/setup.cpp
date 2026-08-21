@@ -12,6 +12,66 @@ bool rebootRequired=false;
 constexpr const wchar_t* kForceOwnClsid=L"{7E950195-94A7-4E5D-9C94-E51E8D0F94CD}";
 constexpr const wchar_t* kForceOwnCommandKey=L"SOFTWARE\\Classes\\AllFilesystemObjects\\shell\\NebulaForceOwn";
 
+struct InstallSelection {
+    bool core=true;
+    bool store=true;
+    bool tools=true;
+};
+
+void print_install_selection(const InstallSelection&selection){
+    std::wcout<<L"Selected components:\n"
+      L"  Core: selected (required)\n"
+      L"  Nebula Store: "<<(selection.store?L"selected":L"not selected")<<L"\n"
+      L"  Local Tools: "<<(selection.tools?L"selected":L"not selected")<<L"\n";
+}
+
+bool parse_install_components(int argc,wchar_t**argv,InstallSelection&selection,bool&specified){
+    specified=false;
+    for(int i=1;i<argc;i++){
+        std::wstring argument=argv[i];
+        if(argument==L"--components"){std::wcerr<<L"Use --components=core,store,tools.\n";return false;}
+        if(argument.rfind(L"--components=",0)!=0)continue;
+        if(specified){std::wcerr<<L"--components may only be specified once.\n";return false;}
+        specified=true;selection={true,false,false};
+        std::wstring value=argument.substr(13);bool seenCore=false,seenStore=false,seenTools=false;
+        size_t start=0;
+        while(true){
+            size_t comma=value.find(L',',start);std::wstring item=value.substr(start,comma==std::wstring::npos?comma:comma-start);
+            bool*seen=nullptr;
+            if(item==L"core")seen=&seenCore;
+            else if(item==L"store")seen=&seenStore;
+            else if(item==L"tools")seen=&seenTools;
+            else {std::wcerr<<L"Invalid component '"<<item<<L"'. Use core, store, and/or tools.\n";return false;}
+            if(*seen){std::wcerr<<L"Duplicate component '"<<item<<L"'.\n";return false;}
+            *seen=true;
+            if(comma==std::wstring::npos)break;
+            start=comma+1;
+        }
+        if(!seenCore){std::wcerr<<L"Core is required and must be included in --components.\n";return false;}
+        selection.store=seenStore;selection.tools=seenTools;
+    }
+    return true;
+}
+
+bool prompt_component(const wchar_t*name){
+    while(true){
+        std::wcout<<L"Install "<<name<<L"? [Y/n] "<<std::flush;std::wstring answer;
+        if(!std::getline(std::wcin,answer)||answer.empty()||answer==L"y"||answer==L"Y"||answer==L"yes"||answer==L"YES")return true;
+        if(answer==L"n"||answer==L"N"||answer==L"no"||answer==L"NO")return false;
+        std::wcout<<L"Please enter y or n.\n";
+    }
+}
+
+InstallSelection select_install_components(){
+    InstallSelection selection;DWORD mode{};
+    if(GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE),&mode)){
+        std::wcout<<L"\nChoose optional Nebula components. Core is required.\n";
+        selection.store=prompt_component(L"Nebula Store");
+        selection.tools=prompt_component(L"Local Tools");
+    }
+    print_install_selection(selection);return selection;
+}
+
 bool admin(){
     BOOL value=FALSE;PSID sid{};SID_IDENTIFIER_AUTHORITY nt=SECURITY_NT_AUTHORITY;
     if(AllocateAndInitializeSid(&nt,2,SECURITY_BUILTIN_DOMAIN_RID,DOMAIN_ALIAS_RID_ADMINS,0,0,0,0,0,0,&sid)){
@@ -29,8 +89,9 @@ void banner(const ModInfo&m,const WindowsInfo&w){
 }
 void help(){
     std::wcout<<L"NebulaSetup - terminal installer for the Nebula Windows customization pack\n"
-      L"Usage: NebulaSetup [--install|--repair|--uninstall] [--dry-run] [--no-pause] [--help]\n"
-      L"Install/repair deploys verinfo.bin, native tools, supported OEM branding, PATH, service, and shortcuts.\n"
+      L"Usage: NebulaSetup [--install|--repair|--uninstall] [--components=core,store,tools] [--dry-run] [--no-pause] [--help]\n"
+      L"Install/repair always deploys Core; Nebula Store and Local Tools are optional and selected by default.\n"
+      L"Use --components with a comma-separated list for unattended selection; core is required.\n"
       L"Legacy NebulaBGRT boot integration is removed safely when detected.\n"
       L"Troubleshooting: NebulaSetup --copy-diagnostics <destination-directory> <payload-file>\n";
 }
@@ -177,7 +238,11 @@ void restore_branding(){
     HKEY oem{};
     if(RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation",0,KEY_SET_VALUE|KEY_WOW64_64KEY,&oem)==ERROR_SUCCESS){restore_oem_value(oem,L"Manufacturer",L"Manufacturer");restore_oem_value(oem,L"Model",L"Model");RegCloseKey(oem);}RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity");RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Integrity");
 }
-std::vector<std::wstring> files(){return {L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"NebulaSetup.exe",L"verinfo.bin",L"README.md",L"SECURITY.md",L"LICENSE",L"LICENSES.md"};}
+std::vector<std::wstring> files(const InstallSelection&selection){
+    std::vector<std::wstring> result={L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"NebulaSetup.exe",L"verinfo.bin",L"README.md",L"SECURITY.md",L"LICENSE",L"LICENSES.md"};
+    if(selection.store)result.push_back(L"N10Store.exe");
+    return result;
+}
 std::vector<std::wstring> installed_tool_files(){return {
     L"Tools\\choco\\choco.exe",L"Tools\\choco\\LICENSE.txt",L"Tools\\choco\\config\\chocolatey.config",
     L"Tools\\Mem Reduct\\memreduct.exe",L"Tools\\Mem Reduct\\License.txt",
@@ -194,24 +259,27 @@ bool verify_installed_tools(const fs::path&destination){
     }
     return ok;
 }
-std::vector<std::wstring> integrity_files(){auto result=files();result.push_back(L"ThemeUpdater\\Update-N10Themes.ps1");result.push_back(L"ThemeUpdater\\Install-DailyUpdater.ps1");return result;}
+std::vector<std::wstring> integrity_files(const InstallSelection&selection){auto result=files(selection);result.push_back(L"ThemeUpdater\\Update-N10Themes.ps1");result.push_back(L"ThemeUpdater\\Install-DailyUpdater.ps1");return result;}
 void remove_retired_file_tools(const fs::path& destination){
     for(const auto*name:{L"n10hash.exe",L"n10pathinfo.exe",L"n10locks.exe"}){fs::path path=destination/name;if(DeleteFileW(path.c_str()))std::wcout<<L"Removed retired tool: "<<path.wstring()<<L"\n";else if(GetLastError()!=ERROR_FILE_NOT_FOUND)MoveFileExW(path.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);}
     remove_file_context_menus();
 }
-bool write_integrity_state(const fs::path& source){
+bool write_integrity_state(const fs::path& source,const InstallSelection&selection){
     HKEY key{};DWORD disposition{};if(RegCreateKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Integrity",0,nullptr,0,KEY_SET_VALUE|KEY_WOW64_64KEY,nullptr,&key,&disposition)!=ERROR_SUCCESS)return false;
-    bool ok=true;for(const auto&name:integrity_files()){const auto extension=fs::path(name).extension();if(extension!=L".exe"&&extension!=L".dll"&&extension!=L".ps1")continue;std::wstring digest=sha256_file((source/name).wstring());if(digest.empty()||RegSetValueExW(key,name.c_str(),0,REG_SZ,reinterpret_cast<const BYTE*>(digest.c_str()),static_cast<DWORD>((digest.size()+1)*sizeof(wchar_t)))!=ERROR_SUCCESS)ok=false;}
+    if(!selection.store)RegDeleteValueW(key,L"N10Store.exe");
+    bool ok=true;for(const auto&name:integrity_files(selection)){const auto extension=fs::path(name).extension();if(extension!=L".exe"&&extension!=L".dll"&&extension!=L".ps1")continue;std::wstring digest=sha256_file((source/name).wstring());if(digest.empty()||RegSetValueExW(key,name.c_str(),0,REG_SZ,reinterpret_cast<const BYTE*>(digest.c_str()),static_cast<DWORD>((digest.size()+1)*sizeof(wchar_t)))!=ERROR_SUCCESS)ok=false;}
     RegCloseKey(key);return ok;
 }
-std::vector<std::wstring> missing_runtime_payload(const fs::path&source){
-    const std::vector<std::wstring> required={L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"verinfo.bin",L"OfficialThemes\\Wallpapers\\Nebula-Official\\Nebula-Aurora.png",L"OfficialThemes\\Icons\\Nebula-Official\\README.txt",L"ThemeUpdater\\Update-N10Themes.ps1",L"ThemeUpdater\\Install-DailyUpdater.ps1",L"Tools\\choco\\choco.exe",L"Tools\\Mem Reduct\\memreduct.exe",L"Tools\\OpenShell\\StartMenu.exe",L"Tools\\WinXShell\\WinXShell.exe",L"Tools\\dwmblurglass\\DWMBlurGlass.exe",L"Tools\\Explorer++.exe",L"Tools\\ShutUp10.exe",L"Tools\\neofetch.exe"};
+std::vector<std::wstring> missing_runtime_payload(const fs::path&source,const InstallSelection&selection){
+    std::vector<std::wstring> required={L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"verinfo.bin",L"OfficialThemes\\Wallpapers\\Nebula-Official\\Nebula-Aurora.png",L"OfficialThemes\\Icons\\Nebula-Official\\README.txt",L"ThemeUpdater\\Update-N10Themes.ps1",L"ThemeUpdater\\Install-DailyUpdater.ps1"};
+    if(selection.store)required.push_back(L"N10Store.exe");
+    if(selection.tools){for(const auto&item:installed_tool_files())required.push_back(item);}
     std::vector<std::wstring> missing;std::error_code ec;
     for(const auto&item:required){if(!fs::is_regular_file(source/item,ec)||ec)missing.push_back(item);ec.clear();}
     return missing;
 }
-bool payload_preflight(const fs::path&source){
-    auto missing=missing_runtime_payload(source);if(missing.empty())return true;
+bool payload_preflight(const fs::path&source,const InstallSelection&selection){
+    auto missing=missing_runtime_payload(source,selection);if(missing.empty())return true;
     std::wcerr<<L"\nINCOMPLETE NEBULA10 PACKAGE\n"
       L"NebulaSetup.exe cannot be installed by itself. Missing required payload:\n";
     for(const auto&item:missing)std::wcerr<<L"  - "<<item<<L"\n";
@@ -283,6 +351,24 @@ void remove_retired_tool_payloads(const fs::path&destination){
         else std::wcout<<L"Removed retired managed tool payload: "<<path.wstring()<<L"\n";
     }
 }
+bool remove_managed_file(const fs::path&path){
+    if(DeleteFileW(path.c_str())||GetLastError()==ERROR_FILE_NOT_FOUND)return true;
+    if(MoveFileExW(path.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT)){rebootRequired=true;return true;}
+    std::wcerr<<L"Could not remove unselected managed file: "<<path.wstring()<<L"\n";return false;
+}
+bool remove_store_shortcuts(){
+    bool ok=true;PWSTR desktop{},programs{};
+    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop,0,nullptr,&desktop))){ok&=remove_managed_file(fs::path(desktop)/L"Nebula Store.lnk");CoTaskMemFree(desktop);}
+    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms,0,nullptr,&programs))){ok&=remove_managed_file(fs::path(programs)/L"Nebula10"/L"Nebula Store.lnk");CoTaskMemFree(programs);}
+    return ok;
+}
+void remove_managed_tools(const fs::path&destination){
+    fs::path tools=destination/L"Tools";std::error_code ec;
+    if(!fs::exists(tools,ec)||ec)return;
+    fs::remove_all(tools,ec);
+    if(ec){schedule_tree_remove(tools);rebootRequired=true;}
+    else std::wcout<<L"Removed unselected managed Local Tools.\n";
+}
 bool remove_legacy_bgrt(const std::wstring&destination){
     fs::path controller=fs::path(destination)/L"NebulaBGRT.exe";DWORD attributes=GetFileAttributesW(controller.c_str());
     bool controllerExists=attributes!=INVALID_FILE_ATTRIBUTES&&(attributes&FILE_ATTRIBUTE_DIRECTORY)==0;
@@ -316,19 +402,30 @@ int wmain(int argc,wchar_t**argv){
         std::wcout<<L"Payload copy diagnostics: "<<(ok?L"PASS":L"FAIL")<<L"\n";return ok?0:6;
     }
     bool uninstall=has_arg(argc,argv,L"--uninstall");std::wstring operation=uninstall?L"uninstall":has_arg(argc,argv,L"--repair")?L"repair":L"install";
-    if(!uninstall&&!payload_preflight(exe_dir()))return 4;
+    InstallSelection selection;bool componentsSpecified=false;
+    if(!parse_install_components(argc,argv,selection,componentsSpecified))return 2;
+    if(uninstall&&componentsSpecified){std::wcerr<<L"--components is only valid with --install or --repair.\n";return 2;}
+    if(!uninstall&&!componentsSpecified&&!dry)selection=select_install_components();
+    if(!uninstall&&!payload_preflight(exe_dir(),selection))return 4;
     ModInfo mod;WindowsInfo windows=get_windows_info();std::wstring manifest=exe_dir()+L"\\verinfo.bin",error;load_verinfo(manifest,mod,&error);banner(mod,windows);std::wstring destination=target();
     if(dry){
+        if(!uninstall)print_install_selection(selection);
         std::wcout<<L"DRY-RUN "<<operation<<L"\nTarget: "<<destination<<L"\n"
           <<L"Would first remove legacy NebulaBGRT boot integration if its installed marker or controller is present.\n"
           <<L"Would "<<(uninstall?L"restore OEM branding and remove":L"deploy")<<L" native applications, verinfo.bin, Nebula identity, OEM branding, service, machine PATH, Desktop and Start Menu shortcuts.\n";
         if(!uninstall)std::wcout<<L"Settings OEM model: "<<settings_oem_model(mod,windows)<<L"\n";
-        if(!uninstall)std::wcout<<L"Shortcuts: Nebula ToolBox and Nebula Store on Desktop and Start Menu; N10 Version remains command-line only.\nToolBox icon: Assets\\Branding\\NebulaToolBox.ico.\nStore icon: Assets\\Branding\\N10Store.ico.\n";
+        if(!uninstall){
+            if(selection.store)std::wcout<<L"Shortcuts: Nebula ToolBox and Nebula Store on Desktop and Start Menu; N10 Version remains command-line only.\nToolBox icon: Assets\\Branding\\NebulaToolBox.ico.\nStore icon: Assets\\Branding\\N10Store.ico.\n";
+            else std::wcout<<L"Shortcuts: Nebula ToolBox on Desktop and Start Menu; the managed Nebula Store shortcuts would be removed. N10 Version remains command-line only.\nToolBox icon: Assets\\Branding\\NebulaToolBox.ico.\n";
+        }
         std::wcout<<(uninstall?L"The daily theme-update task would be removed. Downloaded and user theme data, including C:\\Windows\\NebulaData\\Themes, would be preserved.\n":L"ForceOwn Explorer labels are dynamic: ForceOwn this file, ForceOwn this folder, and ForceOwn all.\nOfficialThemes would be refreshed into the protected official theme store at C:\\Windows\\NebulaData\\Themes without deleting downloaded or user theme data. A verified daily catalog-update task would run at 05:23.\n");
         std::wcout<<L"No changes made.\n";finish_and_pause(true,!noPause);return 0;
     }
     if(!admin()){
-        wchar_t self[MAX_PATH]{};GetModuleFileNameW(nullptr,self,MAX_PATH);std::wstring args=L"--"+operation;if(noPause)args+=L" --no-pause";auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"runas",self,args.c_str(),nullptr,SW_SHOWNORMAL));return result>32?0:5;
+        wchar_t self[MAX_PATH]{};GetModuleFileNameW(nullptr,self,MAX_PATH);std::wstring args=L"--"+operation;
+        if(!uninstall){args+=L" --components=core";if(selection.store)args+=L",store";if(selection.tools)args+=L",tools";}
+        if(noPause)args+=L" --no-pause";
+        auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"runas",self,args.c_str(),nullptr,SW_SHOWNORMAL));return result>32?0:5;
     }
     CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
     if(!remove_legacy_bgrt(destination)){CoUninitialize();finish_and_pause(false,!noPause);return 7;}
@@ -341,21 +438,21 @@ int wmain(int argc,wchar_t**argv){
     if(!service_stop_for_update())std::wcout<<L"UserAuth service could not be stopped; a locked service binary will be replaced after reboot.\n";
     remove_forceown_shell_registration();
     fs::create_directories(destination);auto source=exe_dir();bool ok=true;
-    for(const auto&file:files())ok&=copy_payload_file(fs::path(source)/file,fs::path(destination)/file);
+    for(const auto&file:files(selection))ok&=copy_payload_file(fs::path(source)/file,fs::path(destination)/file);
+    if(!selection.store){ok&=remove_managed_file(fs::path(destination)/L"N10Store.exe");ok&=remove_store_shortcuts();}
     ok&=copy_payload_tree(fs::path(source)/L"Assets",fs::path(destination)/L"Assets");
-    ok&=copy_payload_tree(fs::path(source)/L"Tools",fs::path(destination)/L"Tools");
-    remove_retired_tool_payloads(destination);
-    ok&=verify_installed_tools(destination);
+    if(selection.tools){ok&=copy_payload_tree(fs::path(source)/L"Tools",fs::path(destination)/L"Tools");remove_retired_tool_payloads(destination);ok&=verify_installed_tools(destination);}
+    else remove_managed_tools(destination);
     ok&=copy_payload_tree(fs::path(source)/L"ThemeUpdater",fs::path(destination)/L"ThemeUpdater");
     ok&=copy_payload_tree(fs::path(source)/L"OfficialThemes",fs::path(L"C:\\Windows\\NebulaData\\Themes"));
     remove_retired_file_tools(destination);
     ok&=register_forceown_context_menu(destination);
     ok&=apply_branding(mod,windows);
-    ok&=write_integrity_state(source);
+    ok&=write_integrity_state(source,selection);
     ok&=configure_daily_theme_update(destination,false)==0;
     ok&=service_install(destination);ok&=machine_path(destination,false);remove_legacy_n10_shortcuts();PWSTR desktop{},programs{};std::wstring toolboxIcon=destination+L"\\Assets\\Branding\\NebulaToolBox.ico",storeIcon=destination+L"\\Assets\\Branding\\N10Store.ico";
-    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop,0,nullptr,&desktop))){ok&=shortcut(std::wstring(desktop)+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);ok&=shortcut(std::wstring(desktop)+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(desktop);}
-    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms,0,nullptr,&programs))){std::wstring folder=std::wstring(programs)+L"\\Nebula10";fs::create_directories(folder);ok&=shortcut(folder+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);ok&=shortcut(folder+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(programs);}
+    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop,0,nullptr,&desktop))){ok&=shortcut(std::wstring(desktop)+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);if(selection.store)ok&=shortcut(std::wstring(desktop)+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(desktop);}
+    if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms,0,nullptr,&programs))){std::wstring folder=std::wstring(programs)+L"\\Nebula10";fs::create_directories(folder);ok&=shortcut(folder+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);if(selection.store)ok&=shortcut(folder+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(programs);}
     CoUninitialize();std::wcout<<(ok?L"Nebula 10 installation complete. Open a new terminal and run n10toolbox or n10ver.\n":L"Nebula Setup completed with errors; review the messages above.\n");
     if(rebootRequired)std::wcout<<L"Restart Windows to finish replacing files that were in use.\n";
     finish_and_pause(ok,!noPause);return ok?0:6;

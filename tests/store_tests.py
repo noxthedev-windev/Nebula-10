@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 """Non-networking behavior and policy tests for native N10Store."""
 from pathlib import Path
-import hashlib
 import shutil, subprocess, sys, tempfile
 
 root=Path(sys.argv[1]).resolve()
 store=root/'N10Store.exe'
 assert store.is_file(),f'missing {store}'
-assert hashlib.sha256(store.read_bytes()).hexdigest()=='9ca2fcaeab4388125efa3863e79d3bc5ffa13f4621fa8617e6f9c315e352724f','preserved old N10Store.exe changed'
+
 
 # Chocolatey writes logs even for read-only status/version probes. When a
 # complete packaged Tools tree is supplied, exercise an isolated copy so tests
@@ -46,6 +45,17 @@ assert 'not in the curated N10Store catalog' in out,out
 assert 'chocolatey' in run('choco-status').lower()
 out=run('setup-choco','--dry-run')
 assert 'DRY-RUN' in out and 'Tools\\choco' in out,out
+out=run('paths')
+assert 'NebulaData\\Store\\Downloads' in out and 'NebulaData\\Store\\Cache' in out,out
+out=run('clear-cache','--dry-run')
+assert 'Clear Store Cache' in out and 'No files removed' in out,out
+out=run('install','chrome','--dry-run','--yes')
+assert '--cache-location' in out and 'NebulaData\\Store\\Cache' in out,out
+
+p=subprocess.run([str(store),'menu','--dry-run'],input='1\n1\n1\n\n0\n0\n',capture_output=True,text=True,timeout=30)
+menu_out=p.stdout+p.stderr
+assert p.returncode==0,(p.returncode,menu_out)
+assert 'DRY-RUN' in menu_out and 'googlechrome' in menu_out,menu_out
 
 setup=(Path(__file__).parents[1]/'src/setup.cpp').read_text(encoding='utf-8')
 toolbox=(Path(__file__).parents[1]/'src/n10toolbox.cpp').read_text(encoding='utf-8')
@@ -53,6 +63,6 @@ assert 'N10Store.exe' in setup and 'N10Store.exe' in toolbox
 assert 'N10Store.ico' in setup
 assert 'Nebula Store.lnk' in setup,'Store Desktop/Start Menu shortcuts missing'
 assert 'SetIconLocation' in setup and 'N10Store.ico' in setup
-print(f'store_tests: PASS (preserved old EXE, {len(catalog_lines)} curated packages, safe Chocolatey dry-runs)')
+print(f'store_tests: PASS ({len(catalog_lines)} curated packages, fixed selection, NebulaData cache)')
 if isolated is not None:
     isolated.cleanup()

@@ -53,10 +53,13 @@ cases = [
  ("N10Store.exe", ["--help"], "Usage:"),
  ("N10Store.exe", ["install", "chrome", "--dry-run", "--yes"], "No package changes made"),
  ("N10Store.exe", ["setup-choco", "--dry-run"], "Tools\\choco"),
+ ("N10Store.exe", ["paths"], "NebulaData\\Store\\Downloads"),
+ ("N10Store.exe", ["clear-cache", "--dry-run"], "Clear Store Cache"),
  ("NebulaUserAuth.exe", ["--help"], "No passwords"),
  ("NebulaUserAuthService.exe", ["--help"], "Strict actions"),
  ("NebulaSetup.exe", ["--help"], "Usage:"),
  ("NebulaSetup.exe", ["--install", "--dry-run"], "Finished."),
+ ("NebulaSetup.exe", ["--install", "--dry-run", "--components=core,store"], "Selected components"),
  ("NebulaSetup.exe", ["--uninstall", "--dry-run"], "No changes made"),
 ]
 for exe,args,needle in cases:

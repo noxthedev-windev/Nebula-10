@@ -34,6 +34,14 @@ Preview without changes:
 NebulaSetup.exe --install --dry-run
 ```
 
+Live install/repair opens a native component selector before elevation. **Core** is required; **Nebula Store** and **Local Tools** are selected by default and can be toggled. Automation can use a strict component list:
+
+```bat
+NebulaSetup.exe --install --components=core,store,tools
+NebulaSetup.exe --install --components=core,store
+NebulaSetup.exe --install --components=core
+```
+
 When Setup completes in a real console it prints `Finished.` and waits at `Press Enter to close...`, so the result remains visible. Scripted deployments can disable that pause:
 
 ```bat
@@ -124,7 +132,7 @@ Long categories use a paged viewport with `more above`, `more below`, and `Showi
 
 ## N10Store
 
-`N10Store.exe` is the preserved old keyboard-controlled terminal Store backed by the bundled Chocolatey client. It is copied from `payload/N10Store.exe` into builds and packages without recompilation or behavior changes. Its SHA-256 is `9ca2fcaeab4388125efa3863e79d3bc5ffa13f4621fa8617e6f9c315e352724f`. It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `googlechrome`.
+`N10Store.exe` is a maintained native keyboard-controlled terminal Store backed by the bundled Chocolatey client. It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `googlechrome`.
 
 ```bat
 N10Store
@@ -138,9 +146,12 @@ N10Store uninstall chrome
 N10Store choco-status
 N10Store setup-choco --dry-run
 N10Store setup-choco
+N10Store paths
+N10Store clear-cache --dry-run
+N10Store clear-cache
 ```
 
-N10Store accepts only Chocolatey package IDs compiled into its curated catalog. It does not accept arbitrary package IDs or commands. Install, upgrade, and uninstall show the exact fixed operation; `--dry-run` performs no network or package changes. Store creates missing per-user Desktop and Start Menu shortcuts when run from an enrolled Nebula installation.
+N10Store accepts only Chocolatey package IDs compiled into its curated catalog. It does not accept arbitrary package IDs or commands. Install, upgrade, and uninstall show the exact fixed operation; `--dry-run` performs no network or package changes. Chocolatey cache and installer-temporary data are routed beneath `C:\Windows\NebulaData\Store\Cache` and `C:\Windows\NebulaData\Store\Downloads`. **Clear Store Cache** removes only data beneath those fixed roots. Store creates missing per-user Desktop and Start Menu shortcuts when run from an enrolled Nebula installation.
 
 `n10forceown.exe` remains the guarded native ownership tool. Explorer loads the packaged `NebulaForceOwnShell.dll` command handler so its title reflects the current selection: **ForceOwn this file**, **ForceOwn this folder**, or **ForceOwn all**. The handler passes selected paths only as quoted data arguments; ForceOwn performs its own target preview, protected-path checks, confirmation, logging, and Windows elevation. The retired SHA, Path Info, and Lock Check tools are removed during repair.
 
@@ -199,6 +210,6 @@ ctest --test-dir build --output-on-failure
 ./scripts/package-release.sh
 ```
 
-The build copies the fixed `payload/N10Store.exe` into `build/Release`; it does not compile or replace Store behavior.
+The build compiles the maintained native N10Store source into `build/Release`.
 
 Tests use only read-only and dry-run behavior. They do not install services, write the registry, change PATH, create shortcuts, change wallpaper, or modify boot configuration.

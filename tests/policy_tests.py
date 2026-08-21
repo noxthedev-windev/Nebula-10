@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 """Non-mutating source policy checks for Nebula10."""
 from pathlib import Path
-import hashlib
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 required = [
     "CMakeLists.txt", "src/n10ver.cpp", "src/n10toolbox.cpp",
-    "src/verinfo.hpp", "verinfo.bin", "payload/N10Store.exe",
+    "src/verinfo.hpp", "verinfo.bin", "src/n10store.cpp", "src/n10store.rc",
     "src/user_auth.cpp", "src/auth_service.cpp", "src/setup.cpp",
     "src/n10forceown.cpp", "src/n10themes.cpp", "src/forceown_shell.cpp",
     "README.md", "SECURITY.md", "LICENSES.md",
@@ -50,10 +49,7 @@ cmake=(ROOT/"CMakeLists.txt").read_text(encoding="utf-8")
 package_script=(ROOT/"scripts/package-release.sh").read_text(encoding="utf-8")
 assert "bgrt" not in cmake.lower(), "CMake must not build or install BGRT"
 assert "bgrt" not in package_script.lower(), "release packaging must not stage a BGRT payload"
-assert "add_executable(N10Store" not in cmake, "the preserved Store must not be rebuilt"
-assert "payload/N10Store.exe" in cmake, "the fixed old Store payload must be copied into builds"
-store_payload=ROOT/"payload/N10Store.exe"
-assert hashlib.sha256(store_payload.read_bytes()).hexdigest()=="9ca2fcaeab4388125efa3863e79d3bc5ffa13f4621fa8617e6f9c315e352724f", "preserved old Store payload changed"
+assert "add_executable(N10Store" in cmake, "maintained native Store source must be built"
 for retired in ("n10hash", "n10pathinfo", "n10locks"):
     assert retired.lower() not in (cmake+toolbox).lower(), f"retired native tool still built or exposed: {retired}"
 for retired_exe in ("n10hash.exe", "n10pathinfo.exe", "n10locks.exe"):
@@ -82,4 +78,9 @@ for setup_tools_contract in ("installed_tool_files", "verify_installed_tools", "
     assert setup_tools_contract in setup, f"Setup managed Tools-folder contract missing: {setup_tools_contract}"
 for packaging_contract in ("tool_dirs", "tool_files", "chocolatey.config.backup", "currentuser.reg"):
     assert packaging_contract in package_script, f"clean fixed tool packaging contract missing: {packaging_contract}"
+store=(ROOT/"src/n10store.cpp").read_text(encoding="utf-8")
+for store_contract in (r"C:\\Windows\\NebulaData\\Store", "NEBULA_STORE_DATA_ROOT", "clear-cache", "Clear Store Cache", "--cache-location"):
+    assert store_contract in store, f"Store cache/download contract missing: {store_contract}"
+for setup_selection_contract in ("InstallSelection", "--components=", "select_install_components", "Selected components"):
+    assert setup_selection_contract in setup, f"Setup component selection contract missing: {setup_selection_contract}"
 print("policy_tests: PASS (required files, no public BGRT, strict actions, safe launcher)")

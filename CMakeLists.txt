@@ -33,15 +33,9 @@ target_link_libraries(n10themes PRIVATE shell32 advapi32)
 add_library(NebulaForceOwnShell SHARED src/forceown_shell.cpp)
 set_target_properties(NebulaForceOwnShell PROPERTIES PREFIX "" OUTPUT_NAME "NebulaForceOwnShell")
 target_link_libraries(NebulaForceOwnShell PRIVATE shell32 ole32 uuid)
-set(N10STORE_PAYLOAD "${CMAKE_SOURCE_DIR}/payload/N10Store.exe")
-set(N10STORE_OUTPUT "${CMAKE_BINARY_DIR}/Release/N10Store.exe")
-add_custom_command(
-  OUTPUT "${N10STORE_OUTPUT}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/Release"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${N10STORE_PAYLOAD}" "${N10STORE_OUTPUT}"
-  DEPENDS "${N10STORE_PAYLOAD}"
-  COMMENT "Copying preserved N10Store.exe payload")
-add_custom_target(N10Store ALL DEPENDS "${N10STORE_OUTPUT}")
+add_executable(N10Store src/n10store.cpp src/n10store.rc)
+nebula_console(N10Store)
+target_link_libraries(N10Store PRIVATE advapi32 shell32 ole32 uuid)
 add_executable(NebulaUserAuth src/user_auth.cpp)
 nebula_console(NebulaUserAuth)
 target_link_libraries(NebulaUserAuth PRIVATE advapi32)
@@ -77,6 +71,5 @@ if(Python3_Interpreter_FOUND)
  add_test(NAME theme_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/theme_tests.py ${CMAKE_BINARY_DIR}/Release)
  add_test(NAME simplification_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/simplification_tests.py)
 endif()
-install(TARGETS n10ver n10toolbox n10forceown n10themes NebulaForceOwnShell NebulaUserAuth NebulaUserAuthService NebulaSetup RUNTIME DESTINATION . LIBRARY DESTINATION .)
-install(FILES "${N10STORE_PAYLOAD}" DESTINATION .)
+install(TARGETS n10ver n10toolbox n10forceown n10themes NebulaForceOwnShell N10Store NebulaUserAuth NebulaUserAuthService NebulaSetup RUNTIME DESTINATION . LIBRARY DESTINATION .)
 install(FILES README.md SECURITY.md LICENSES.md verinfo.bin DESTINATION .)

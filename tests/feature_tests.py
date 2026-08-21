@@ -66,6 +66,9 @@ for needle in (
 settings_model = next((line for line in out.splitlines() if line.startswith("Settings OEM model")), "")
 assert settings_model.startswith("Settings OEM model: Nebula 10"), settings_model
 assert "Windows" not in settings_model, settings_model
+out = run("NebulaSetup.exe", ["--install", "--dry-run", "--components=core,store"])
+for needle in ("Selected components", "Core", "Nebula Store", "Local Tools: not selected"):
+    assert needle in out, (needle, out)
 
 # Build and Setup source contracts cover the machine-wide 64-bit Explorer
 # registration and ensure the DLL never receives the console -municode option.
