@@ -27,7 +27,6 @@ void help(){
       L"        |computer|diskmgmt|registry|sysinfo|reliability|performance|environment|features|security|power>\n"
       L"  maintenance <list|diskcleanup|optimize|storage|update|recovery|startup|troubleshoot|backup|restore>\n"
       L"  localtool <list|launch|enable|disable> [memreduct|openshell|winxshell|dwmblur|explorerpp|shutup10|neofetch]\n"
-      L"  themes <help|roots|list|update|daily|daily-remove|select-wallpaper|select-icons> [pack]\n"
       L"  assets, logs, request <allowlisted-action>\n"
       L"Companion application: N10Store.\n"
       L"Run n10toolbox with no arguments to open the TUI.\n";
@@ -108,42 +107,9 @@ int run_child_wait_args(const std::wstring& exe,const std::vector<std::wstring>&
     std::wstring command=quote_process_arg(exe);for(const auto&arg:args)command+=L" "+quote_process_arg(arg);
     std::vector<wchar_t> buf(command.begin(),command.end());buf.push_back(0);
     STARTUPINFOW si{};si.cb=sizeof(si);PROCESS_INFORMATION pi{};
-    if(!CreateProcessW(exe.c_str(),buf.data(),nullptr,nullptr,FALSE,0,nullptr,exe_dir().c_str(),&si,&pi)){std::wcerr<<L"Could not launch n10themes.exe (error "<<GetLastError()<<L").\n";return 5;}
+    if(!CreateProcessW(exe.c_str(),buf.data(),nullptr,nullptr,FALSE,0,nullptr,exe_dir().c_str(),&si,&pi)){std::wcerr<<L"Could not launch child process (error "<<GetLastError()<<L").\n";return 5;}
     WaitForSingleObject(pi.hProcess,INFINITE);DWORD code{};GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);return static_cast<int>(code);
 }
-bool valid_theme_pack_name(const std::wstring& name){
-    if(name.empty()||name==L"."||name==L".."||name.back()==L'.'||name.back()==L' ')return false;
-    for(wchar_t ch:name)if(ch<32||wcschr(L"/\\:<>\"|?*",ch))return false;
-    return true;
-}
-int theme_updater_action(const std::wstring& action,bool dry){
-    bool update=action==L"update",remove=action==L"daily-remove";
-    if(!update&&action!=L"daily"&&!remove)return 2;
-    std::wstring script=exe_dir()+L"\\ThemeUpdater\\"+(update?L"Update-N10Themes.ps1":L"Install-DailyUpdater.ps1");
-    std::wstring label=update?L"update official themes now":remove?L"remove the daily theme update task":L"install or repair the daily theme update task";
-    if(dry){std::wcout<<L"DRY-RUN: would "<<label<<L" using the fixed verified Nebula-10-Themes catalog.\n";return 0;}
-    if(!require_nebula_integrity(L"n10toolbox.exe"))return 8;
-    if(!path_exists(script)){std::wcerr<<L"Theme updater payload missing: "<<script<<L"\n";return 4;}
-    const wchar_t* integrityName=update?L"ThemeUpdater\\Update-N10Themes.ps1":L"ThemeUpdater\\Install-DailyUpdater.ps1";
-    if(!require_nebula_integrity(integrityName))return 8;
-    wchar_t windows[MAX_PATH]{};GetWindowsDirectoryW(windows,MAX_PATH);std::wstring powershell=std::wstring(windows)+L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
-    std::wstring arguments=L"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "+quote_process_arg(script)+(remove?L" -Remove":L"");
-    auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"runas",powershell.c_str(),arguments.c_str(),exe_dir().c_str(),SW_SHOWNORMAL));
-    return result>32?0:5;
-}
-int theme_command(const std::vector<std::wstring>& args,bool dry){
-    if(args.size()<2){std::wcerr<<L"themes requires help, roots, list, update, daily, daily-remove, select-wallpaper, or select-icons.\n";return 2;}
-    const std::wstring& action=args[1];std::vector<std::wstring> child;
-    if(action==L"help"&&args.size()==2)child.push_back(L"--help");
-    else if((action==L"update"||action==L"daily"||action==L"daily-remove")&&args.size()==2)return theme_updater_action(action,dry);
-    else if((action==L"roots"||action==L"list")&&args.size()==2)child.push_back(action);
-    else if((action==L"select-wallpaper"||action==L"select-icons")&&args.size()==3){
-        if(!valid_theme_pack_name(args[2])){std::wcerr<<L"Refused unsafe theme pack name.\n";return 2;}
-        child={action,args[2]};if(dry)child.push_back(L"--dry-run");
-    }else{std::wcerr<<L"Invalid themes command. Use --help.\n";return 2;}
-    return run_child_wait_args(exe_dir()+L"\\n10themes.exe",child);
-}
-
 int request(const std::wstring& action,bool dry){
     if(!action_allowed(action)){std::wcerr<<L"Rejected: not an allowlisted action.\n";return 3;}
     std::wstring exe=exe_dir()+L"\\NebulaUserAuth.exe",cmd=L"\""+exe+L"\" "+action;
@@ -306,7 +272,6 @@ int dispatch(const std::vector<std::wstring>& args,bool dry){
     if(c==L"tool"&&args.size()>=2)return windows_tool(args[1],dry);
     if(c==L"maintenance"&&args.size()>=2)return maintenance_tool(args[1],dry);
     if(c==L"localtool")return local_tool_command(args,dry);
-    if(c==L"themes")return theme_command(args,dry);
     if(c==L"assets"||c==L"logs")return open_nebula_folder(c,dry);
     std::wcerr<<L"Unknown or incomplete command. Use --help.\n";return 2;
 }
@@ -376,42 +341,6 @@ std::wstring environment_path(const wchar_t* name){
     DWORD needed=GetEnvironmentVariableW(name,nullptr,0);if(!needed)return L"";
     std::vector<wchar_t> value(needed);return GetEnvironmentVariableW(name,value.data(),needed)?value.data():L"";
 }
-std::wstring official_theme_root(){std::wstring overridePath=environment_path(L"NEBULA_THEME_ROOT");return overridePath.empty()?L"C:\\Windows\\NebulaData\\Themes":overridePath;}
-std::wstring selected_theme_root(){
-    std::wstring overridePath=environment_path(L"NEBULA_THEME_DOCUMENTS");if(!overridePath.empty())return overridePath;
-    wchar_t documents[MAX_PATH]{};return SUCCEEDED(SHGetFolderPathW(nullptr,CSIDL_PERSONAL,nullptr,SHGFP_TYPE_CURRENT,documents))?std::wstring(documents)+L"\\Themes":L"Documents\\Themes";
-}
-std::vector<std::wstring> theme_packs(const wchar_t* category){
-    std::vector<std::wstring> packs;WIN32_FIND_DATAW data{};std::wstring pattern=official_theme_root()+L"\\"+category+L"\\*";HANDLE find=FindFirstFileW(pattern.c_str(),&data);
-    if(find==INVALID_HANDLE_VALUE)return packs;
-    do{std::wstring name=data.cFileName;if((data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)&&!(data.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)&&name!=L"."&&name!=L".."&&valid_theme_pack_name(name))packs.push_back(name);}while(FindNextFileW(find,&data));
-    FindClose(find);std::sort(packs.begin(),packs.end(),[](const std::wstring&a,const std::wstring&b){return _wcsicmp(a.c_str(),b.c_str())<0;});return packs;
-}
-int open_theme_folder(bool official,bool dry){
-    std::wstring path=official?official_theme_root():selected_theme_root();const wchar_t* label=official?L"official theme storage":L"selected themes";
-    if(dry){std::wcout<<L"DRY-RUN: would open "<<label<<L": "<<path<<L"\n";return 0;}
-    if(!path_exists(path)){std::wcerr<<L"Theme folder does not exist: "<<path<<L"\n";return 2;}
-    return launch(path.c_str())?0:5;
-}
-void select_theme_pack_tui(bool wallpaperPack,bool dry){
-    const wchar_t* category=wallpaperPack?L"Wallpapers":L"Icons";std::vector<std::wstring> packs=theme_packs(category);
-    if(packs.empty()){clear_screen();std::wcout<<L"No official "<<category<<L" packs are currently installed.\n\n";theme_command({L"themes",L"list"},dry);pause_action();return;}
-    std::vector<MenuEntry> entries;for(const auto&pack:packs)entries.push_back({pack,wallpaperPack?L"Copy and apply this wallpaper pack":L"Copy this icon pack"});entries.push_back({L"Back",L"Return to N10 Themes"});
-    for(;;){int selected=select_menu(wallpaperPack?L"Select Wallpaper Pack":L"Select Icon Pack",entries,dry);if(selected<0||static_cast<size_t>(selected)==packs.size())return;clear_screen();int rc=theme_command({L"themes",wallpaperPack?L"select-wallpaper":L"select-icons",packs[selected]},dry);if(rc)std::wcout<<L"\nAction returned code "<<rc<<L".\n";pause_action();}
-}
-void themes_tui(bool dry){
-    const std::vector<MenuEntry> entries={
-      {L"Official Pack Catalog",L"Show installed wallpaper and icon packs"},
-      {L"Update Official Themes Now",L"Fetch fixed JSON catalog and verify SHA-256 hashes"},
-      {L"Install Daily Updates",L"Run verified catalog sync every day at 05:23"},
-      {L"Remove Daily Updates",L"Unregister the automatic catalog task"},
-      {L"Select Wallpaper Pack",L"Choose an official wallpaper pack"},
-      {L"Select Icon Pack",L"Choose an official icon pack"},
-      {L"Open Official Storage",L"C:\\Windows\\NebulaData\\Themes"},
-      {L"Open Selected Themes",L"Documents\\Themes"},
-      {L"Back",L"Return to Main Menu"}};
-    for(;;){int selected=select_menu(L"N10 Themes",entries,dry);if(selected<0||selected==8)return;if(selected==4){select_theme_pack_tui(true,dry);continue;}if(selected==5){select_theme_pack_tui(false,dry);continue;}clear_screen();int rc=selected==0?theme_command({L"themes",L"list"},dry):selected==1?theme_command({L"themes",L"update"},dry):selected==2?theme_command({L"themes",L"daily"},dry):selected==3?theme_command({L"themes",L"daily-remove"},dry):open_theme_folder(selected==6,dry);if(rc)std::wcout<<L"\nAction returned code "<<rc<<L".\n";pause_action();}
-}
 int run_tui(bool dry){
     enable_console_ui();
     const std::vector<MenuEntry> main={
@@ -423,14 +352,13 @@ int run_tui(bool dry){
       {L"Maintenance",L"Cleanup, drives, updates, and recovery"},
       {L"Machine Features",L"Narrow UserAuth service actions"},
       {L"Local Nebula Tools",L"Configurable tools supplied in the Nebula tools folder"},
-      {L"N10 Themes",L"Official wallpaper and icon pack catalog"},
       {L"N10Store",L"Curated software store using bundled Chocolatey"},
       {L"Recovery & Files",L"Rollback, Nebula logs, assets, and help"},
       {L"Exit",L"Close Nebula ToolBox"},
     };
     for(;;){
         int selected=select_menu(L"Main Menu",main,dry,true);
-        if(selected<0||selected==11){std::wcout<<L"Goodbye from Nebula ToolBox.\n";return 0;}
+        if(selected<0||selected==10){std::wcout<<L"Goodbye from Nebula ToolBox.\n";return 0;}
         if(selected==0)action_menu(L"System & Identity",{{L"System Dashboard",L"Live hardware summary"},{L"N10 Version",L"Nebula and genuine Windows identity"},{L"System Doctor",L"Installation and readiness checks"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return show_info();if(i==1)return run_child_wait(exe_dir()+L"\\n10ver.exe");return system_doctor();});
         else if(selected==1)action_menu(L"Customize & Tune",{{L"Privacy Profile",L"Conservative current-user privacy"},{L"Balanced Profile",L"Conservative visual responsiveness"},{L"Power User Profile",L"Show extensions and hidden files"},{L"Wallpaper: Aurora",L"Nebula artwork"},{L"Wallpaper: Midnight",L"Nebula artwork"},{L"Wallpaper: Violet",L"Nebula artwork"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i<3)return apply_profile(i==0?L"privacy":i==1?L"balanced":L"poweruser",dry);const wchar_t* name=i==3?L"Aurora":i==4?L"Midnight":L"Violet";return wallpaper(exe_dir()+L"\\Assets\\Wallpapers\\Nebula-"+name+L".png",dry);});
         else if(selected==2)action_menu(L"Diagnostics",{{L"Summary",L"Windows, CPU, and memory"},{L"Storage",L"System-volume capacity and free space"},{L"Battery",L"Power source and charge"},{L"Display",L"Monitor and primary display mode"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* modes[]={L"summary",L"storage",L"battery",L"display"};return diagnostics(modes[i]);});
@@ -439,9 +367,8 @@ int run_tui(bool dry){
         else if(selected==5)action_menu(L"Maintenance",{{L"Disk Cleanup",L"Microsoft cleanup utility"},{L"Optimize Drives",L"Microsoft drive optimizer"},{L"Storage Settings",L"Storage Sense and usage"},{L"Windows Update",L"Microsoft update page"},{L"System Protection",L"Restore points and recovery"},{L"Startup Apps",L"Programs that run at sign-in"},{L"Troubleshooters",L"Recommended and additional troubleshooters"},{L"Backup Settings",L"Windows backup configuration"},{L"System Restore",L"Launch restore-point recovery"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* items[]={L"diskcleanup",L"optimize",L"storage",L"update",L"recovery",L"startup",L"troubleshoot",L"backup",L"restore"};return maintenance_tool(items[i],dry);});
         else if(selected==6)action_menu(L"Machine Features",{{L"Enable Long Paths",L"Allowlisted machine action"},{L"Restore Long Paths",L"Restore captured original state"},{L"Apply OEM Branding",L"Allowlisted Nebula branding"},{L"Restore OEM Branding",L"Restore captured original state"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* actions[]={L"LONG_PATHS_ON",L"LONG_PATHS_OFF",L"OEM_BRANDING_ON",L"OEM_BRANDING_OFF"};return request(actions[i],dry);});
         else if(selected==7)local_tools_tui(dry);
-        else if(selected==8)themes_tui(dry);
-        else if(selected==9){run_child_wait(exe_dir()+L"\\N10Store.exe",dry?L"--dry-run":L"");}
-        else if(selected==10)action_menu(L"Recovery & Files",{{L"Rollback User Settings",L"Restore all captured HKCU values"},{L"Open Nebula Logs",L"ProgramData service logs"},{L"Open Nebula Assets",L"Wallpapers and branding"},{L"Command Help",L"All automation commands"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return rollback(dry);if(i==1)return open_nebula_folder(L"logs",dry);if(i==2)return open_nebula_folder(L"assets",dry);help();return 0;});
+        else if(selected==8){run_child_wait(exe_dir()+L"\\N10Store.exe",dry?L"--dry-run":L"");}
+        else if(selected==9)action_menu(L"Recovery & Files",{{L"Rollback User Settings",L"Restore all captured HKCU values"},{L"Open Nebula Logs",L"ProgramData service logs"},{L"Open Nebula Assets",L"Wallpapers and branding"},{L"Command Help",L"All automation commands"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return rollback(dry);if(i==1)return open_nebula_folder(L"logs",dry);if(i==2)return open_nebula_folder(L"assets",dry);help();return 0;});
     }
 }
 }

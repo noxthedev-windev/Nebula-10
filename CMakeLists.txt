@@ -27,9 +27,6 @@ target_link_libraries(n10toolbox PRIVATE shell32 advapi32)
 add_executable(n10forceown src/n10forceown.cpp)
 nebula_console(n10forceown)
 target_link_libraries(n10forceown PRIVATE shell32 advapi32)
-add_executable(n10themes src/n10themes.cpp)
-nebula_console(n10themes)
-target_link_libraries(n10themes PRIVATE shell32 advapi32)
 add_library(NebulaForceOwnShell SHARED src/forceown_shell.cpp)
 set_target_properties(NebulaForceOwnShell PROPERTIES PREFIX "" OUTPUT_NAME "NebulaForceOwnShell")
 target_link_libraries(NebulaForceOwnShell PRIVATE shell32 ole32 uuid)
@@ -54,12 +51,8 @@ add_custom_command(TARGET NebulaSetup POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/../tools/dwmblurglass" "$<TARGET_FILE_DIR:NebulaSetup>/Tools/dwmblurglass"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/../tools/Explorer++.exe" "$<TARGET_FILE_DIR:NebulaSetup>/Tools/Explorer++.exe"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/../tools/ShutUp10.exe" "$<TARGET_FILE_DIR:NebulaSetup>/Tools/ShutUp10.exe"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/../tools/neofetch.exe" "$<TARGET_FILE_DIR:NebulaSetup>/Tools/neofetch.exe"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/theme_catalog/scripts" "$<TARGET_FILE_DIR:NebulaSetup>/ThemeUpdater"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:NebulaSetup>/OfficialThemes/Wallpapers/Nebula-Official"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:NebulaSetup>/OfficialThemes/Icons/Nebula-Official"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets/Wallpapers" "$<TARGET_FILE_DIR:NebulaSetup>/OfficialThemes/Wallpapers/Nebula-Official"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/assets/Themes/Icons/Nebula Official/README.txt" "$<TARGET_FILE_DIR:NebulaSetup>/OfficialThemes/Icons/Nebula-Official/README.txt")
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/../tools/neofetch.exe" "$<TARGET_FILE_DIR:NebulaSetup>/Tools/neofetch.exe")
+
 enable_testing()
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
@@ -68,8 +61,7 @@ if(Python3_Interpreter_FOUND)
  add_test(NAME feature_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/feature_tests.py ${CMAKE_BINARY_DIR}/Release)
 
  add_test(NAME store_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/store_tests.py ${CMAKE_BINARY_DIR}/Release)
- add_test(NAME theme_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/theme_tests.py ${CMAKE_BINARY_DIR}/Release)
  add_test(NAME simplification_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/simplification_tests.py)
 endif()
-install(TARGETS n10ver n10toolbox n10forceown n10themes NebulaForceOwnShell N10Store NebulaUserAuth NebulaUserAuthService NebulaSetup RUNTIME DESTINATION . LIBRARY DESTINATION .)
+install(TARGETS n10ver n10toolbox n10forceown NebulaForceOwnShell N10Store NebulaUserAuth NebulaUserAuthService NebulaSetup RUNTIME DESTINATION . LIBRARY DESTINATION .)
 install(FILES README.md SECURITY.md LICENSES.md verinfo.bin DESTINATION .)

@@ -54,13 +54,12 @@ for needle in ("Nebula System Doctor", "verinfo.bin", "UserAuth", "N10Store", "O
 assert "bgrt" not in out.lower(), out
 
 # Setup preview must include mod identity, ForceOwn shell behavior, and the
-# protected official theme store without mutating the machine.
+# installed component selection without mutating the machine.
 out = run("NebulaSetup.exe", ["--install", "--dry-run"])
 for needle in (
     "Nebula Windows", "verinfo.bin", "OEM branding", "Finished.",
-    "Shortcuts: Nebula ToolBox and Nebula Store",
+    "Selected components", "Shortcuts: Nebula ToolBox and Nebula Store",
     "NebulaToolBox.ico", "ForceOwn this file", "ForceOwn this folder", "ForceOwn all",
-    r"C:\Windows\NebulaData\Themes", "protected official theme store",
 ):
     assert needle in out, (needle, out)
 settings_model = next((line for line in out.splitlines() if line.startswith("Settings OEM model")), "")
@@ -74,7 +73,7 @@ for needle in ("Selected components", "Core", "Nebula Store", "Local Tools: not 
 # registration and ensure the DLL never receives the console -municode option.
 cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 setup_source = (ROOT / "src/setup.cpp").read_text(encoding="utf-8")
-for needle in ("n10forceown", "n10themes", "NebulaForceOwnShell", "SHARED"):
+for needle in ("n10forceown", "NebulaForceOwnShell", "SHARED"):
     assert needle in cmake, (needle, cmake)
 assert "bgrt" not in cmake.lower(), "CMake must not build or install a BGRT target"
 assert "add_link_options(-municode" not in cmake, cmake
@@ -83,7 +82,7 @@ for needle in (
     r"SOFTWARE\\Classes\\AllFilesystemObjects\\shell\\NebulaForceOwn",
     "ExplorerCommandHandler", "MultiSelectModel", "Player", "InprocServer32",
     "ThreadingModel", "Apartment", r"Shell Extensions\\Approved", "KEY_WOW64_64KEY",
-    "NebulaForceOwnShell.dll", "n10forceown.exe", "n10themes.exe", "OfficialThemes",
+    "NebulaForceOwnShell.dll", "n10forceown.exe",
 ):
     assert needle in setup_source, (needle, setup_source)
 assert 'extension!=L".exe"&&extension!=L".dll"' in setup_source, setup_source

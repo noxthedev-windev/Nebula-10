@@ -155,20 +155,19 @@ N10Store accepts only Chocolatey package IDs compiled into its curated catalog. 
 
 `n10forceown.exe` remains the guarded native ownership tool. Explorer loads the packaged `NebulaForceOwnShell.dll` command handler so its title reflects the current selection: **ForceOwn this file**, **ForceOwn this folder**, or **ForceOwn all**. The handler passes selected paths only as quoted data arguments; ForceOwn performs its own target preview, protected-path checks, confirmation, logging, and Windows elevation. The retired SHA, Path Info, and Lock Check tools are removed during repair.
 
-## N10 Themes
+## Local Nebula Tools
 
-N10 Themes browses and selects official wallpaper and icon packs. Official content is held in the protected catalog store at `C:\Windows\NebulaData\Themes`; selected packs are copied to `%USERPROFILE%\Documents\Themes\Wallpapers` or `%USERPROFILE%\Documents\Themes\Icons`. Icon packs are staged for compatible Nebula components and are never applied by patching Windows system DLLs.
+The installer deploys a curated set of local tools under `C:\Program Files\Nebula10\Tools`, each configurable in N10 ToolBox:
 
-```bat
-n10themes roots
-n10themes list
-n10themes select-wallpaper Nebula-Official --dry-run
-n10themes select-icons Nebula-Official --dry-run
-n10toolbox themes update --dry-run
-n10toolbox themes daily --dry-run
-```
+- **Mem Reduct** — interactive memory working-set utility (`Tools\Mem Reduct\memreduct.exe`)
+- **OpenShell** — Start menu configuration
+- **WinXShell** — alternative shell UI components
+- **DWMBlurGlass** — desktop composition appearance
+- **Explorer++** — portable file manager
+- **ShutUp10** — advanced privacy UI (review every change)
+- **NeoFetch** — terminal system summary
 
-The downloadable catalog lives in the separate public `noxthedev-windev/Nebula-10-Themes` repository. Its updater accepts only fixed GitHub URLs and strict relative paths, verifies every SHA-256 before installation, preserves unknown/local packs, and can run as a daily scheduled task. ToolBox verifies the packaged updater scripts against Setup's enrolled integrity records before launching them.
+Use `n10toolbox localtool list` to see enabled status, `n10toolbox localtool enable|disable <id>` to toggle, and `n10toolbox localtool launch <id> --dry-run` to preview launch.
 
 All menu actions are still available as commands. Use `n10toolbox --help` for the complete list.
 

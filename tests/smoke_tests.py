@@ -40,15 +40,6 @@ cases = [
  ("n10toolbox.exe", ["assets", "--dry-run"], "Assets"),
  ("n10toolbox.exe", ["logs", "--dry-run"], "Logs"),
  ("n10toolbox.exe", ["request", "LONG_PATHS_ON", "--dry-run"], "DRY-RUN"),
- ("n10toolbox.exe", ["themes", "roots"], "N10 Themes roots"),
- ("n10toolbox.exe", ["themes", "list"], "N10 Themes official packs"),
- ("n10toolbox.exe", ["themes", "update", "--dry-run"], "fixed verified Nebula-10-Themes catalog"),
- ("n10toolbox.exe", ["themes", "daily", "--dry-run"], "daily theme update task"),
- ("n10toolbox.exe", ["themes", "daily-remove", "--dry-run"], "remove the daily theme update task"),
-
- ("n10themes.exe", ["--help"], "Usage:"),
- ("n10themes.exe", ["roots"], "Official root:"),
- ("n10themes.exe", ["list"], "N10 Themes official packs"),
 
  ("N10Store.exe", ["--help"], "Usage:"),
  ("N10Store.exe", ["install", "chrome", "--dry-run", "--yes"], "No package changes made"),
@@ -77,29 +68,19 @@ p=subprocess.run([str(b/'n10toolbox.exe'),'menu','--dry-run'],input='0\n',
                  capture_output=True,text=True,timeout=15)
 out=p.stdout+p.stderr
 assert p.returncode==0,(p.returncode,out)
-for needle in ('Main Menu','N10 Themes','Goodbye from Nebula ToolBox.'):
+for needle in ('Main Menu','N10Store','Goodbye from Nebula ToolBox.'):
  assert needle in out,(needle,out)
+assert 'N10 Themes' not in out,out
 assert 'bgrt' not in out.lower(),out
 print('PASS n10toolbox.exe redirected menu rendering and exit')
-with tempfile.TemporaryDirectory(prefix='n10-toolbox-themes-') as td:
- root=Path(td)/'official'
- docs=Path(td)/'selected'
- pack=root/'Wallpapers'/'Pack With Spaces'
- pack.mkdir(parents=True)
- (pack/'sample.png').write_bytes(b'smoke')
- env=os.environ.copy()
- env['NEBULA_THEME_ROOT']=str(root)
- env['NEBULA_THEME_DOCUMENTS']=str(docs)
+with tempfile.TemporaryDirectory(prefix='n10-toolbox-store-') as td:
  p=subprocess.run([str(b/'n10toolbox.exe'),'menu','--dry-run'],
-                  input='9\n5\n1\n\n0\n0\n',capture_output=True,text=True,
-                  timeout=15,env=env)
+                  input='9\n0\n',capture_output=True,text=True,
+                  timeout=15)
  out=p.stdout+p.stderr
  assert p.returncode==0,(p.returncode,out)
- for needle in ('N10 Themes','Select Wallpaper Pack','Pack With Spaces',
-                'DRY-RUN: selection validated','Goodbye from Nebula ToolBox.'):
-  assert needle in out,(needle,out)
- assert not docs.exists(),docs
-print('PASS n10toolbox.exe redirected N10 Themes pack preview')
+ assert 'N10Store' in out and 'Goodbye from Nebula ToolBox.' in out,(needle,out)
+print('PASS n10toolbox.exe opens N10Store from the main menu')
 # strict rejection happens before pipe/service access
 p=subprocess.run([str(b/'NebulaUserAuth.exe'),'CMD.EXE'],capture_output=True,text=True)
 assert p.returncode==3 and 'not allowlisted' in (p.stdout+p.stderr)

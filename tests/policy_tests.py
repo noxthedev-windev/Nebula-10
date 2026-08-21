@@ -8,7 +8,7 @@ required = [
     "CMakeLists.txt", "src/n10ver.cpp", "src/n10toolbox.cpp",
     "src/verinfo.hpp", "verinfo.bin", "src/n10store.cpp", "src/n10store.rc",
     "src/user_auth.cpp", "src/auth_service.cpp", "src/setup.cpp",
-    "src/n10forceown.cpp", "src/n10themes.cpp", "src/forceown_shell.cpp",
+    "src/n10forceown.cpp", "src/forceown_shell.cpp",
     "README.md", "SECURITY.md", "LICENSES.md",
 ]
 missing = [p for p in required if not (ROOT / p).is_file()]
@@ -61,16 +61,9 @@ for contract in ("IExplorerCommand", "IObjectWithSelection", "GetCount", "SIGDN_
     assert contract in forceown, f"native multi-selection shell handler missing: {contract}"
 for contract in ("ExplorerCommandHandler", "NebulaForceOwnShell.dll", "MultiSelectModel", "register_forceown_context_menu"):
     assert contract in setup, f"ForceOwn context-menu registration missing: {contract}"
-themes=(ROOT/"src/n10themes.cpp").read_text(encoding="utf-8")
-for contract in (r"C:\\Windows\\NebulaData\\Themes", r"Documents\\Themes\\Wallpapers", r"Documents\\Themes\\Icons", "select-wallpaper", "select-icons"):
-    assert contract in themes, f"N10 Themes contract missing: {contract}"
-assert "N10 Themes" in toolbox and "n10themes.exe" in toolbox, "N10 Themes must be exposed in ToolBox"
-for contract in ("NebulaData", "OfficialThemes", "register_forceown_context_menu"):
-    assert contract in setup, f"Setup theme/context integration missing: {contract}"
-for contract in ("configure_daily_theme_update", "Install-DailyUpdater.ps1", "05:23", "integrity_files"):
-    assert contract in setup, f"daily verified theme updater integration missing: {contract}"
-for updater_integrity in (r'ThemeUpdater\\Update-N10Themes.ps1', r'ThemeUpdater\\Install-DailyUpdater.ps1'):
-    assert updater_integrity in setup and updater_integrity in toolbox, f"updater integrity enrollment missing: {updater_integrity}"
+assert "N10 Themes" not in toolbox, "N10 Themes must be removed from ToolBox"
+assert "n10themes.exe" not in setup, "N10 Themes payload must not be installed"
+assert "ThemeUpdater" not in setup, "Theme updater must not be wired into Setup"
 for local_tool in ("Mem Reduct", "OpenShell", "WinXShell", "dwmblurglass", "Explorer++.exe", "ShutUp10.exe", "neofetch.exe"):
     assert local_tool.lower() in toolbox.lower(), f"ToolBox local tool missing: {local_tool}"
 assert "ToolPreferences" in toolbox and "Enabled" in toolbox, "ToolBox tool configurability missing"
