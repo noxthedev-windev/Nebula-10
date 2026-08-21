@@ -41,15 +41,9 @@ for action in ('install','upgrade','uninstall'):
     assert '--accept-package-agreements' in out and '--accept-source-agreements' in out,out
     assert 'No package changes made' in out,out
 
-out=run('install','chrome','--dry-run','--yes','--provider=choco')
-assert 'choco.exe' in out and 'googlechrome' in out,out
-# Chocolatey 2.x removed the --cache-location CLI option; cache routing must
-# happen through the ChocolateyCacheLocation environment variable instead.
-assert '--cache-location' not in out,'choco 2.x rejects --cache-location'
-out=run('upgrade','chrome','--dry-run','--yes','--provider=choco')
-assert '--cache-location' not in out,out
 out=run('install','chrome','--dry-run','--yes','--provider=winget')
 assert 'winget' in out.lower() and 'Google.Chrome' in out,out
+# Winget-only Store: unknown providers are rejected with usage guidance.
 out=run('install','chrome','--dry-run','--yes','--provider=bogus',code=2)
 assert 'Unknown provider' in out,out
 
@@ -80,7 +74,9 @@ assert r'NebulaData\\Store\\Cache' in setup and r'NebulaData\\Store\\Downloads' 
 # Winget availability must be checked with a clear error, and actions must
 # report success/failure explicitly instead of a bare exit code.
 assert 'winget_on_path' in store_src,'Winget availability check missing'
-assert 'Winget (App Installer) was not found' in store_src,'Winget-missing guidance missing'
+assert '[ERROR] No winget detected on this PC.' in store_src,'Winget-missing guidance missing'
+assert 'aka.ms/getwinget' in store_src,'winget install link missing'
+assert 'falling back to bundled Chocolatey' not in store_src,'Store must be winget-only (no silent fallback)'
 assert 'installed successfully' in store_src.lower(),'explicit install success feedback missing'
 assert 'NebulaSetup repair' in store_src,'Store data-folder recovery guidance missing'
 # Live actions must relaunch the Store itself elevated (one UAC prompt) and
@@ -90,6 +86,12 @@ assert 'NebulaSetup repair' in store_src,'Store data-folder recovery guidance mi
 assert 'relaunch_elevated' in store_src,'self-elevation relaunch missing'
 assert 'CreateProcessW(exe.c_str()' in store_src,'provider must be spawned with inheriting environment'
 assert 'ChocolateyCacheLocation' in store_src,'choco cache env override missing'
+# The elevated worker runs in a second console whose output would vanish;
+# provider output must be captured to a fixed log and echoed into the
+# caller's console, and a cancelled UAC prompt must read as cancelled.
+assert 'StoreAction.log' in store_src,'provider output must be captured to a fixed log'
+assert 'print_action_log' in store_src,'caller console must echo captured provider output'
+assert 'UAC prompt was cancelled' in store_src,'UAC cancellation must be reported distinctly'
 assert 'N10Store.exe' in setup and 'N10Store.exe' in toolbox
 assert 'N10Store.ico' in setup
 assert 'Nebula Store.lnk' in setup,'Store Desktop/Start Menu shortcuts missing'

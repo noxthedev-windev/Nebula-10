@@ -448,10 +448,37 @@ int relaunch_elevated(const std::wstring& arguments) {
     launch.cbSize = sizeof(launch); launch.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
     launch.lpVerb = L"runas"; launch.lpFile = executable; launch.lpParameters = arguments.c_str();
     launch.lpDirectory = working_directory.c_str(); launch.nShow = SW_SHOWNORMAL;
-    if (!ShellExecuteExW(&launch)) return GetLastError() == ERROR_CANCELLED ? 1223 : 5;
+    if (!ShellExecuteExW(&launch)) {
+        const DWORD error = GetLastError();
+        if (error == ERROR_CANCELLED) std::wcerr << L"\nThe UAC prompt was cancelled; nothing was changed.\n";
+        else std::wcerr << L"Could not start the elevated Store worker: " << windows_error(error) << L" (" << error << L")\n";
+        return error==ERROR_CANCELLED?1223:5;
+    }
     WaitForSingleObject(launch.hProcess, INFINITE); DWORD code = 1;
     GetExitCodeProcess(launch.hProcess, &code); CloseHandle(launch.hProcess);
     return static_cast<int>(code);
+}
+
+std::wstring action_log_path() { return store_paths().root + L"\\StoreAction.log"; }
+
+// The elevated worker runs in its own console whose output would vanish when
+// it exits. It therefore tees provider output into a fixed log file, and the
+// calling (unelevated) copy prints that log so the user sees the real reason.
+void print_action_log() {
+    const std::wstring path = action_log_path();
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return;
+    char buffer[4096]; DWORD read = 0;
+    std::string bytes;
+    while (ReadFile(file, buffer, sizeof(buffer), &read, nullptr) && read) bytes.append(buffer, buffer + read);
+    CloseHandle(file);
+    if (bytes.empty()) return;
+    const int length = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
+    std::wstring text(length, L'\0');
+    if (length) MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), text.data(), length);
+    std::wcout << L"--- provider output ---\n" << text;
+    if (!text.empty() && text.back() != L'\n') std::wcout << L"\n";
+    std::wcout << L"--- end of provider output ---\n";
 }
 
 int run_choco(const std::vector<std::wstring>& args, bool dry_run) {
@@ -499,9 +526,9 @@ int run_winget(const std::vector<std::wstring>& args, bool dry_run) {
         return 0;
     }
     if (!winget_on_path()) {
-        std::wcerr << L"Winget (App Installer) was not found on this PC.\n"
-                      L"Install \"App Installer\" from the Microsoft Store, then try again,\n"
-                      L"or run: n10store install <slug> --provider=choco\n";
+        std::wcerr << L"[ERROR] No winget detected on this PC.\n"
+                      L"Install it from the Microsoft Store (search \"App Installer\"),\n"
+                      L"or from https://aka.ms/getwinget , then reopen Nebula Store and try again.\n";
         return 4;
     }
     if (!create_store_directories(paths)) {
@@ -509,11 +536,25 @@ int run_winget(const std::vector<std::wstring>& args, bool dry_run) {
         return 5;
     }
     std::wstring parameters;for(const auto& arg:args){if(!parameters.empty())parameters+=L" ";parameters+=quote_argument(arg);}
+    // Scoped overrides are visible to CreateProcessW children (they inherit
+    // this process environment). The elevated worker tees its console into
+    // StoreAction.log so the calling window can show the real reason.
     ScopedEnvironment temp(L"TEMP", paths.downloads), tmp(L"TMP", paths.downloads);
-    SHELLEXECUTEINFOW launch{};launch.cbSize=sizeof(launch);launch.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC;launch.lpVerb=L"runas";launch.lpFile=exe.c_str();launch.lpParameters=parameters.c_str();launch.lpDirectory=paths.downloads.c_str();launch.nShow=SW_SHOWNORMAL;
-    BOOL started=ShellExecuteExW(&launch);
-    if(!started){DWORD error=GetLastError();std::wcerr<<L"Could not start Winget: "<<windows_error(error)<<L" ("<<error<<L")\n";return error==ERROR_CANCELLED?1223:5;}
-    WaitForSingleObject(launch.hProcess,INFINITE);DWORD exit_code=1;if(!GetExitCodeProcess(launch.hProcess,&exit_code))exit_code=1;CloseHandle(launch.hProcess);return static_cast<int>(exit_code);
+    std::wstring command=L"\""+exe+L"\" "+parameters+L" 2>&1";std::vector<wchar_t> buffer(command.begin(),command.end());buffer.push_back(0);
+    SECURITY_ATTRIBUTES inherit{sizeof(inherit),nullptr,TRUE};
+    HANDLE log=CreateFileW(action_log_path().c_str(),FILE_WRITE_DATA|FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,&inherit,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+    HANDLE conIn=GetStdHandle(STD_INPUT_HANDLE),conErr=GetStdHandle(STD_ERROR_HANDLE);
+    STARTUPINFOW startup{};startup.cb=sizeof(startup);
+    if(log!=INVALID_HANDLE_VALUE){
+        startup.dwFlags=STARTF_USESTDHANDLES;
+        startup.hStdInput=conIn;startup.hStdOutput=log;startup.hStdError=log;
+    }
+    PROCESS_INFORMATION process{};
+    BOOL started=CreateProcessW(exe.c_str(),buffer.data(),nullptr,nullptr,TRUE,0,nullptr,paths.downloads.c_str(),&startup,&process);
+    if(!started){DWORD error=GetLastError();if(log!=INVALID_HANDLE_VALUE)CloseHandle(log);std::wcerr<<L"Could not start Winget: "<<windows_error(error)<<L" ("<<error<<L")\n";return 5;}
+    WaitForSingleObject(process.hProcess,INFINITE);DWORD exit_code=1;if(!GetExitCodeProcess(process.hProcess,&exit_code))exit_code=1;CloseHandle(process.hThread);CloseHandle(process.hProcess);
+    if(log!=INVALID_HANDLE_VALUE)CloseHandle(log);
+    return static_cast<int>(exit_code);
 }
 
 int run_choco_readonly(const std::vector<std::wstring>& args){
@@ -528,7 +569,7 @@ void report_action_result(const std::wstring& action, const Package& package, in
         if (action == L"install") std::wcout << L"You can close this window and use the app now.\n";
     } else {
         std::wcerr << L"\n" << package.name << L" " << action << L" FAILED (exit code " << exit_code << L").\n"
-                   << L"The provider printed the reason above. Nothing was broken; you can retry or pick another provider with --provider=choco.\n";
+                   << L"The provider output above shows the reason. Nothing was broken; you can retry.\n";
     }
 }
 
@@ -546,36 +587,28 @@ int package_action(const std::wstring& action, const Package& package, bool dry_
         return 0;
     }
     if(!dry_run&&!nebula::require_nebula_integrity(L"N10Store.exe"))return 8;
+    // Winget-only Store: no provider fallback. If winget is missing the user
+    // gets a clear [ERROR] with install guidance and can retry after setup.
+    if(!dry_run && !winget_on_path()){
+        std::wcerr << L"[ERROR] No winget detected on this PC.\n"
+                      L"Install it from the Microsoft Store (search \"App Installer\"),\n"
+                      L"or from https://aka.ms/getwinget , then reopen Nebula Store and try again.\n";
+        return 4;
+    }
     const StorePaths paths = store_paths();
     // Live actions need admin rights. Elevate this Store executable itself
     // (one UAC prompt) with a fixed internal subcommand; the elevated copy
     // re-enters package_action elevated, sets the cache/temp environment
-    // there, and spawns the provider with an inheriting CreateProcessW.
+    // there, and spawns winget with an inheriting CreateProcessW.
     if(!dry_run && !process_is_elevated()){
-        std::wstring relaunch = L"__elevated " + action + L" " + package.slug + L" --yes";
-        if(provider==Provider::Winget)relaunch+=L" --provider=winget";
-        else if(provider==Provider::Choco)relaunch+=L" --provider=choco";
+        std::wstring relaunch = L"__elevated " + action + L" " + package.slug + L" --yes --provider=winget";
         const int rc=relaunch_elevated(relaunch);
+        print_action_log();
         report_action_result(action, package, rc);
         return rc;
-    }
-    if(provider==Provider::Choco){
-        const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"No allowlisted Chocolatey package exists for this entry.\n";return 4;}
-        // Chocolatey 2.x removed --cache-location; cache routing happens via
-        // the ChocolateyCacheLocation environment variable in run_choco.
-        std::vector<std::wstring> args = {action, id, L"-y", L"--no-progress"};
-        return run_choco(args, dry_run);
     }
     std::wstring verb = action==L"uninstall" ? L"uninstall" : action==L"upgrade" ? L"upgrade" : L"install";
     std::vector<std::wstring> args = {verb, L"--id", package.id, L"--exact", L"--silent", L"--accept-package-agreements", L"--accept-source-agreements", L"--disable-interactivity"};
-    if(provider==Provider::Auto && !dry_run && !winget_on_path()){
-        const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"Winget was not found and no Chocolatey fallback exists for this entry.\n";return 4;}
-        std::wcerr<<L"Winget was not found; falling back to bundled Chocolatey.\n";
-        std::vector<std::wstring> chocoArgs = {action, id, L"-y", L"--no-progress"};
-        int rc=run_choco(chocoArgs, dry_run);
-        report_action_result(action, package, rc);
-        return rc;
-    }
     const int rc = run_winget(args, dry_run);
     report_action_result(action, package, rc);
     return rc;
