@@ -37,8 +37,16 @@ assert 'Firefox' in run('search','browser')
 
 for action in ('install','upgrade','uninstall'):
     out=run(action,'chrome','--dry-run','--yes')
-    assert 'DRY-RUN' in out and 'googlechrome' in out and 'choco.exe' in out,out
+    assert 'DRY-RUN' in out and 'winget' in out.lower() and 'Google.Chrome' in out,out
+    assert '--accept-package-agreements' in out and '--accept-source-agreements' in out,out
     assert 'No package changes made' in out,out
+
+out=run('install','chrome','--dry-run','--yes','--provider=choco')
+assert 'choco.exe' in out and 'googlechrome' in out and '--cache-location' in out,out
+out=run('install','chrome','--dry-run','--yes','--provider=winget')
+assert 'winget' in out.lower() and 'Google.Chrome' in out,out
+out=run('install','chrome','--dry-run','--yes','--provider=bogus',code=2)
+assert 'Unknown provider' in out,out
 
 out=run('install','Totally.Arbitrary.Package','--dry-run','--yes',code=2)
 assert 'not in the curated N10Store catalog' in out,out
@@ -50,19 +58,31 @@ assert 'NebulaData\\Store\\Downloads' in out and 'NebulaData\\Store\\Cache' in o
 out=run('clear-cache','--dry-run')
 assert 'Clear Store Cache' in out and 'No files removed' in out,out
 out=run('install','chrome','--dry-run','--yes')
-assert '--cache-location' in out and 'NebulaData\\Store\\Cache' in out,out
+assert 'NebulaData\\Store\\Downloads' in out and 'NebulaData\\Store\\Cache' in out,out
 
 p=subprocess.run([str(store),'menu','--dry-run'],input='1\n1\n1\n\n0\n0\n',capture_output=True,text=True,timeout=30)
 menu_out=p.stdout+p.stderr
 assert p.returncode==0,(p.returncode,menu_out)
-assert 'DRY-RUN' in menu_out and 'googlechrome' in menu_out,menu_out
+assert 'DRY-RUN' in menu_out and 'Google.Chrome' in menu_out,menu_out
 
 setup=(Path(__file__).parents[1]/'src/setup.cpp').read_text(encoding='utf-8')
 toolbox=(Path(__file__).parents[1]/'src/n10toolbox.cpp').read_text(encoding='utf-8')
+store_src=(Path(__file__).parents[1]/'src/n10store.cpp').read_text(encoding='utf-8')
+# Setup (elevated) must pre-create the fixed Store data roots so the
+# unelevated Store app never has to mkdir under C:\Windows itself.
+assert r'NebulaData\\Store\\Cache' in setup and r'NebulaData\\Store\\Downloads' in setup, \
+    'Setup must create the NebulaData Store Cache/Downloads folders'
+# Winget availability must be checked with a clear error, and actions must
+# report success/failure explicitly instead of a bare exit code.
+assert 'winget_on_path' in store_src,'Winget availability check missing'
+assert 'Winget (App Installer) was not found' in store_src,'Winget-missing guidance missing'
+assert 'installed successfully' in store_src.lower(),'explicit install success feedback missing'
+assert 'NebulaSetup repair' in store_src,'Store data-folder recovery guidance missing'
 assert 'N10Store.exe' in setup and 'N10Store.exe' in toolbox
 assert 'N10Store.ico' in setup
 assert 'Nebula Store.lnk' in setup,'Store Desktop/Start Menu shortcuts missing'
 assert 'SetIconLocation' in setup and 'N10Store.ico' in setup
-print(f'store_tests: PASS ({len(catalog_lines)} curated packages, fixed selection, NebulaData cache)')
+assert 'quality-of-life tools' in setup.lower(), 'Setup must ask about quality-of-life tools from Tools folder'
+print(f'store_tests: PASS ({len(catalog_lines)} curated packages, Winget install default, fixed selection, NebulaData cache)')
 if isolated is not None:
     isolated.cleanup()

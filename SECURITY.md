@@ -20,7 +20,7 @@ The service permits terminal-only approval after installation because its powers
 
 Current-user settings preserve original existence, type, and data before mutation. `n10toolbox rollback` restores them. Machine ON actions save the original machine value; the matching OFF action restores it. Nebula Setup separately backs up the pre-install OEM `Manufacturer` and `Model` values before applying the Nebula identity and restores them during uninstall. The custom `HKLM\SOFTWARE\Nebula10\Identity` key contains only Nebula-owned metadata and is removed on uninstall.
 
-Legacy NebulaBGRT is no longer distributed or exposed by ToolBox. Setup retains only a guarded cleanup path for machines that previously installed it: the old installed controller must successfully restore the boot path before its recovery files can be removed. The normal test suite never installs services, writes settings, changes PATH/shortcuts, or modifies boot configuration.
+The normal test suite never installs services, writes settings, changes PATH/shortcuts, or modifies boot configuration.
 
 ## ForceOwn boundary
 

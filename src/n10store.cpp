@@ -37,6 +37,8 @@ struct Package {
     const wchar_t* description;
 };
 
+enum class Provider { Auto, Winget, Choco };
+
 // Deliberately curated and compiled in: package identifiers are never accepted from input.
 static const Package kCatalog[] = {
     {L"chrome", L"Google Chrome", L"Google.Chrome", L"Browsers", L"Google's fast, widely compatible web browser."},
@@ -311,20 +313,21 @@ bool console_input() { DWORD mode = 0; return GetConsoleMode(GetStdHandle(STD_IN
 
 void print_help() {
     std::wcout
-        << L"n10store - Nebula10 curated Chocolatey application store\n"
+        << L"n10store - Nebula10 curated Winget/Chocolatey application store\n"
         << L"Usage:\n"
         << L"  n10store [menu]\n"
         << L"  n10store --help\n"
         << L"  n10store list [category]\n"
         << L"  n10store search QUERY\n"
         << L"  n10store info SLUG\n"
-        << L"  n10store install SLUG [--dry-run] [--yes]\n"
-        << L"  n10store upgrade SLUG [--dry-run] [--yes]\n"
-        << L"  n10store uninstall SLUG [--dry-run] [--yes]\n"
+        << L"  n10store install SLUG [--dry-run] [--yes] [--provider=winget|choco|auto]\n"
+        << L"  n10store upgrade SLUG [--dry-run] [--yes] [--provider=winget|choco|auto]\n"
+        << L"  n10store uninstall SLUG [--dry-run] [--yes] [--provider=winget|choco|auto]\n"
         << L"  n10store paths\n"
         << L"  n10store clear-cache [--dry-run]\n"
         << L"  n10store choco-status\n"
         << L"  n10store setup-choco [--dry-run]\n\n"
+        << L"Provider examples: --provider=winget, --provider=choco, or --provider=auto.\n"
         << L"Only slugs from the compiled catalog are accepted. Categories:\n  ";
     for (size_t i = 0; i < sizeof(kCategories) / sizeof(kCategories[0]); ++i)
         std::wcout << (i ? L", " : L"") << kCategories[i];
@@ -335,6 +338,7 @@ void print_package(const Package& p) {
     std::wcout << L"Name       : " << p.name << L"\n"
                << L"Slug       : " << p.slug << L"\n"
                << L"Category   : " << p.category << L"\n"
+               << L"Winget     : " << p.id << L"\n"
                << L"Chocolatey : " << (choco_id(p)?choco_id(p):L"Unavailable") << L"\n"
                << L"Description: " << p.description << L"\n";
 }
@@ -342,9 +346,9 @@ void print_package(const Package& p) {
 int print_list(const std::vector<const Package*>& packages) {
     if (packages.empty()) { std::wcout << L"No catalog entries matched.\n"; return 1; }
     std::wcout << L"Nebula Store catalog (" << packages.size() << L" entries)\n";
-    std::wcout << L"SLUG | NAME | CHOCOLATEY ID | CATEGORY\n";
+    std::wcout << L"SLUG | NAME | WINGET ID | CHOCOLATEY ID | CATEGORY\n";
     std::wcout << L"--------------------------------------------------------------------------------\n";
-    for (const Package* p : packages) std::wcout << p->slug << L" | " << p->name << L" | " << (choco_id(*p)?choco_id(*p):L"Unavailable") << L" | " << p->category << L"\n";
+    for (const Package* p : packages) std::wcout << p->slug << L" | " << p->name << L" | " << p->id << L" | " << (choco_id(*p)?choco_id(*p):L"Unavailable") << L" | " << p->category << L"\n";
     return 0;
 }
 
@@ -364,6 +368,26 @@ std::wstring resolve_choco() {
     std::wstring packaged=nebula::exe_dir()+L"\\Tools\\choco\\choco.exe";
     if(GetFileAttributesW(packaged.c_str())!=INVALID_FILE_ATTRIBUTES)return packaged;
     return L"";
+}
+
+bool winget_on_path(){
+    wchar_t found[MAX_PATH]{};
+    return SearchPathW(nullptr, L"winget.exe", nullptr, MAX_PATH, found, nullptr)!=0;
+}
+
+std::wstring resolve_winget() {
+    wchar_t found[MAX_PATH]{};
+    if (SearchPathW(nullptr, L"winget.exe", nullptr, MAX_PATH, found, nullptr)) return found;
+    std::wstring localAppData = environment_value(L"LOCALAPPDATA");
+    if (!localAppData.empty()) {
+        std::wstring appInstaller = localAppData + L"\\Microsoft\\WindowsApps\\winget.exe";
+        if (GetFileAttributesW(appInstaller.c_str()) != INVALID_FILE_ATTRIBUTES) return appInstaller;
+    }
+    return L"winget.exe";
+}
+
+const wchar_t* provider_name(Provider provider) {
+    return provider == Provider::Choco ? L"Chocolatey" : provider == Provider::Winget ? L"Winget" : L"Auto";
 }
 
 std::wstring quote_argument(const std::wstring& value) {
@@ -442,9 +466,47 @@ int run_choco(const std::vector<std::wstring>& args, bool dry_run) {
     return static_cast<int>(exit_code);
 }
 
+int run_winget(const std::vector<std::wstring>& args, bool dry_run) {
+    const StorePaths paths = store_paths();
+    const std::wstring exe = resolve_winget();
+    if (dry_run) {
+        std::wcout << L"DRY-RUN: would run " << display_command(exe, args) << L"\n";
+        std::wcout << L"Downloads: " << paths.downloads << L"\nCache: " << paths.cache << L"\n";
+        std::wcout << L"No package changes made; no process or network request was started.\n";
+        return 0;
+    }
+    if (!winget_on_path()) {
+        std::wcerr << L"Winget (App Installer) was not found on this PC.\n"
+                      L"Install \"App Installer\" from the Microsoft Store, then try again,\n"
+                      L"or run: n10store install <slug> --provider=choco\n";
+        return 4;
+    }
+    if (!create_store_directories(paths)) {
+        std::wcerr << L"Could not create the NebulaData Store folders. Run NebulaSetup repair from the complete package.\n";
+        return 5;
+    }
+    std::wstring parameters;for(const auto& arg:args){if(!parameters.empty())parameters+=L" ";parameters+=quote_argument(arg);}
+    ScopedEnvironment temp(L"TEMP", paths.downloads), tmp(L"TMP", paths.downloads);
+    SHELLEXECUTEINFOW launch{};launch.cbSize=sizeof(launch);launch.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC;launch.lpVerb=L"runas";launch.lpFile=exe.c_str();launch.lpParameters=parameters.c_str();launch.lpDirectory=paths.downloads.c_str();launch.nShow=SW_SHOWNORMAL;
+    BOOL started=ShellExecuteExW(&launch);
+    if(!started){DWORD error=GetLastError();std::wcerr<<L"Could not start Winget: "<<windows_error(error)<<L" ("<<error<<L")\n";return error==ERROR_CANCELLED?1223:5;}
+    WaitForSingleObject(launch.hProcess,INFINITE);DWORD exit_code=1;if(!GetExitCodeProcess(launch.hProcess,&exit_code))exit_code=1;CloseHandle(launch.hProcess);return static_cast<int>(exit_code);
+}
+
 int run_choco_readonly(const std::vector<std::wstring>& args){
     const std::wstring exe=resolve_choco();if(exe.empty())return 4;std::wstring command=quote_argument(exe);for(const auto&arg:args)command+=L" "+quote_argument(arg);std::vector<wchar_t> buffer(command.begin(),command.end());buffer.push_back(0);
     std::wstring root=exe.substr(0,exe.find_last_of(L"\\/"));wchar_t old[32768]{};DWORD oldSize=GetEnvironmentVariableW(L"ChocolateyInstall",old,32768);SetEnvironmentVariableW(L"CHOCOLATEYINSTALL",nullptr);SetEnvironmentVariableW(L"ChocolateyInstall",root.c_str());STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};BOOL started=CreateProcessW(exe.c_str(),buffer.data(),nullptr,nullptr,TRUE,0,nullptr,root.c_str(),&startup,&process);if(oldSize&&oldSize<32768)SetEnvironmentVariableW(L"ChocolateyInstall",old);else SetEnvironmentVariableW(L"ChocolateyInstall",nullptr);if(!started)return 5;WaitForSingleObject(process.hProcess,INFINITE);DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hThread);CloseHandle(process.hProcess);return static_cast<int>(code);
+}
+
+void report_action_result(const std::wstring& action, const Package& package, int exit_code) {
+    const wchar_t* past = action==L"install" ? L"installed successfully." : action==L"upgrade" ? L"upgraded successfully." : L"uninstalled successfully.";
+    if (exit_code == 0) {
+        std::wcout << L"\n" << package.name << L" was " << past << L"\n";
+        if (action == L"install") std::wcout << L"You can close this window and use the app now.\n";
+    } else {
+        std::wcerr << L"\n" << package.name << L" " << action << L" FAILED (exit code " << exit_code << L").\n"
+                   << L"The provider printed the reason above. Nothing was broken; you can retry or pick another provider with --provider=choco.\n";
+    }
 }
 
 bool confirm_action(const std::wstring& action, const Package& package, bool assume_yes) {
@@ -455,16 +517,31 @@ bool confirm_action(const std::wstring& action, const Package& package, bool ass
     return ieq(answer, L"y") || ieq(answer, L"yes");
 }
 
-int package_action(const std::wstring& action, const Package& package, bool dry_run, bool assume_yes) {
-    if (!dry_run && !confirm_action(action, package, assume_yes)) {
+int package_action(const std::wstring& action, const Package& package, bool dry_run, bool assume_yes, Provider provider) {
+    if (!dry_run && !confirm_action(action + L" using " + provider_name(provider), package, assume_yes)) {
         std::wcout << L"Cancelled.\n";
         return 0;
     }
-    const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"No allowlisted Chocolatey package exists for this entry.\n";return 4;}
     if(!dry_run&&!nebula::require_nebula_integrity(L"N10Store.exe"))return 8;
     const StorePaths paths = store_paths();
-    std::vector<std::wstring> args = {action, id, L"-y", L"--no-progress", L"--cache-location", paths.cache};
-    return run_choco(args, dry_run);
+    if(provider==Provider::Choco){
+        const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"No allowlisted Chocolatey package exists for this entry.\n";return 4;}
+        std::vector<std::wstring> args = {action, id, L"-y", L"--no-progress", L"--cache-location", paths.cache};
+        return run_choco(args, dry_run);
+    }
+    std::wstring verb = action==L"uninstall" ? L"uninstall" : action==L"upgrade" ? L"upgrade" : L"install";
+    std::vector<std::wstring> args = {verb, L"--id", package.id, L"--exact", L"--silent", L"--accept-package-agreements", L"--accept-source-agreements", L"--disable-interactivity"};
+    if(provider==Provider::Auto && !dry_run && !winget_on_path()){
+        const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"Winget was not found and no Chocolatey fallback exists for this entry.\n";return 4;}
+        std::wcerr<<L"Winget was not found; falling back to bundled Chocolatey.\n";
+        std::vector<std::wstring> chocoArgs = {action, id, L"-y", L"--no-progress", L"--cache-location", paths.cache};
+        int rc=run_choco(chocoArgs, dry_run);
+        report_action_result(action, package, rc);
+        return rc;
+    }
+    const int rc = run_winget(args, dry_run);
+    report_action_result(action, package, rc);
+    return rc;
 }
 
 struct MenuEntry { std::wstring primary; std::wstring secondary; };
@@ -528,7 +605,7 @@ void pause_action() {
     if (console_input()) _getwch(); else { std::wstring ignored; std::getline(std::wcin, ignored); }
 }
 
-int package_menu(const Package& package, bool dry_run) {
+int package_menu(const Package& package, bool dry_run, Provider provider) {
     const std::vector<MenuEntry> actions = {
         {L"Install", L"Install exact catalog package"}, {L"Information", package.description},
         {L"Upgrade", L"Upgrade exact catalog package"}, {L"Uninstall", L"Remove exact catalog package"},
@@ -539,24 +616,24 @@ int package_menu(const Package& package, bool dry_run) {
         if (selected < 0 || selected == 4) return 0;
         clear_screen(); int rc = 0;
         if (selected == 1) print_package(package);
-        else rc = package_action(selected == 0 ? L"install" : selected == 2 ? L"upgrade" : L"uninstall", package, dry_run, false);
+        else rc = package_action(selected == 0 ? L"install" : selected == 2 ? L"upgrade" : L"uninstall", package, dry_run, false, provider);
         if (rc) std::wcout << L"\nAction returned code " << rc << L".\n";
         pause_action();
     }
 }
 
-void browse_menu(const std::wstring& title, const std::vector<const Package*>& packages, bool dry_run) {
+void browse_menu(const std::wstring& title, const std::vector<const Package*>& packages, bool dry_run, Provider provider) {
     std::vector<MenuEntry> entries;
     for (const Package* p : packages) entries.push_back({p->name, std::wstring(p->slug) + L" | " + p->category});
     entries.push_back({L"Back", L"Return to Nebula Store"});
     for (;;) {
         int selected = select_menu(title, entries);
         if (selected < 0 || static_cast<size_t>(selected) == packages.size()) return;
-        package_menu(*packages[static_cast<size_t>(selected)],dry_run);
+        package_menu(*packages[static_cast<size_t>(selected)],dry_run,provider);
     }
 }
 
-void category_menu(bool dry_run) {
+void category_menu(bool dry_run, Provider provider) {
     std::vector<MenuEntry> entries;
     for (const wchar_t* category : kCategories) {
         size_t count = filter_category(category).size();
@@ -566,19 +643,19 @@ void category_menu(bool dry_run) {
     for (;;) {
         int selected = select_menu(L"Categories", entries);
         if (selected < 0 || static_cast<size_t>(selected) == sizeof(kCategories) / sizeof(kCategories[0])) return;
-        browse_menu(kCategories[selected], filter_category(kCategories[selected]),dry_run);
+        browse_menu(kCategories[selected], filter_category(kCategories[selected]),dry_run,provider);
     }
 }
 
-void search_menu(bool dry_run) {
+void search_menu(bool dry_run, Provider provider) {
     clear_screen(); std::wcout << L"Search the curated catalog\n\nQuery (blank to cancel): ";
     std::wstring query; if (!std::getline(std::wcin, query) || query.empty()) return;
     auto matches = search_catalog(query);
     if (matches.empty()) { std::wcout << L"\nNo catalog entries matched \"" << query << L"\".\n"; pause_action(); return; }
-    browse_menu(L"Search results for \"" + query + L"\"", matches,dry_run);
+    browse_menu(L"Search results for \"" + query + L"\"", matches,dry_run,provider);
 }
 
-int run_tui(bool dry_run) {
+int run_tui(bool dry_run, Provider provider) {
     enable_console_ui();
     const std::vector<MenuEntry> main = {
         {L"Browse all applications", std::to_wstring(kCatalogSize) + L" curated entries"},
@@ -594,9 +671,9 @@ int run_tui(bool dry_run) {
     for (;;) {
         int selected = select_menu(L"Curated applications installed through folder-bound Chocolatey", main, true);
         if (selected < 0 || selected == 7) { clear_screen(); std::wcout << L"Goodbye from Nebula Store.\n"; return 0; }
-        if (selected == 0) browse_menu(L"All applications", all,dry_run);
-        else if (selected == 1) category_menu(dry_run);
-        else if (selected == 2) search_menu(dry_run);
+        if (selected == 0) browse_menu(L"All applications", all,dry_run,provider);
+        else if (selected == 1) category_menu(dry_run,provider);
+        else if (selected == 2) search_menu(dry_run,provider);
         else {
             clear_screen();
             int rc = 0;
@@ -620,18 +697,27 @@ int invalid_usage(const std::wstring& message) {
 int wmain(int argc, wchar_t** argv) {
     ensure_store_shortcuts();
     bool dry_run = false, assume_yes = false;
+    Provider provider = Provider::Auto;
     std::vector<std::wstring> positional;
     for (int i = 1; i < argc; ++i) {
         std::wstring arg = argv[i];
         if (ieq(arg, L"--help") || ieq(arg, L"-h")) { print_help(); return 0; }
         if (ieq(arg, L"--dry-run")) { dry_run = true; continue; }
         if (ieq(arg, L"--yes")) { assume_yes = true; continue; }
+        if (arg.rfind(L"--provider=",0)==0) {
+            std::wstring value=lower(arg.substr(11));
+            if(value==L"auto")provider=Provider::Auto;
+            else if(value==L"winget")provider=Provider::Winget;
+            else if(value==L"choco"||value==L"chocolatey")provider=Provider::Choco;
+            else return invalid_usage(L"Unknown provider: " + value + L". Use winget, choco, or auto.");
+            continue;
+        }
         if (!arg.empty() && arg[0] == L'-') return invalid_usage(L"Unknown option: " + arg);
         positional.push_back(arg);
     }
     if (positional.empty() || ieq(positional[0], L"menu")) {
-        if (positional.size() > 1 || assume_yes) return invalid_usage(L"menu accepts only --dry-run.");
-        return run_tui(dry_run);
+        if (positional.size() > 1 || assume_yes) return invalid_usage(L"menu accepts only --dry-run and --provider=winget|choco|auto.");
+        return run_tui(dry_run,provider);
     }
     const std::wstring command = lower(positional[0]);
     if (command == L"list") {
@@ -676,10 +762,10 @@ int wmain(int argc, wchar_t** argv) {
         return run_choco_readonly({L"--version"});
     }
     if (command == L"install" || command == L"upgrade" || command == L"uninstall") {
-        if (positional.size() != 2) return invalid_usage(L"Usage: n10store " + command + L" SLUG [--dry-run] [--yes]");
+        if (positional.size() != 2) return invalid_usage(L"Usage: n10store " + command + L" SLUG [--dry-run] [--yes] [--provider=winget|choco|auto]");
         const Package* p = find_slug(positional[1]);
         if (!p) return invalid_usage(L"Package is not in the curated N10Store catalog: " + positional[1] + L". Arbitrary package IDs are not allowed.");
-        return package_action(command, *p, dry_run, assume_yes);
+        return package_action(command, *p, dry_run, assume_yes, provider);
     }
     return invalid_usage(L"Unknown command: " + positional[0]);
 }

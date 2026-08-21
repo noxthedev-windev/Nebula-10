@@ -132,7 +132,7 @@ Long categories use a paged viewport with `more above`, `more below`, and `Showi
 
 ## N10Store
 
-`N10Store.exe` is a maintained native keyboard-controlled terminal Store backed by the bundled Chocolatey client. It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `googlechrome`.
+`N10Store.exe` is a maintained native keyboard-controlled terminal Store. Installs run through **Winget** by default and fall back to the bundled Chocolatey client automatically when Winget is missing; you can force either with `--provider=winget|choco|auto`. It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `Google.Chrome`.
 
 ```bat
 N10Store
@@ -141,17 +141,17 @@ N10Store search browser
 N10Store info chrome
 N10Store install chrome --dry-run
 N10Store install chrome
+N10Store install chrome --provider=choco
 N10Store upgrade chrome
 N10Store uninstall chrome
 N10Store choco-status
 N10Store setup-choco --dry-run
-N10Store setup-choco
 N10Store paths
 N10Store clear-cache --dry-run
 N10Store clear-cache
 ```
 
-N10Store accepts only Chocolatey package IDs compiled into its curated catalog. It does not accept arbitrary package IDs or commands. Install, upgrade, and uninstall show the exact fixed operation; `--dry-run` performs no network or package changes. Chocolatey cache and installer-temporary data are routed beneath `C:\Windows\NebulaData\Store\Cache` and `C:\Windows\NebulaData\Store\Downloads`. **Clear Store Cache** removes only data beneath those fixed roots. Store creates missing per-user Desktop and Start Menu shortcuts when run from an enrolled Nebula installation.
+N10Store accepts only package IDs compiled into its curated catalog. It does not accept arbitrary package IDs or commands. Install, upgrade, and uninstall show the exact fixed operation and report success or failure explicitly; `--dry-run` performs no network or package changes. Downloads and cache data are routed beneath `C:\Windows\NebulaData\Store\Downloads` and `C:\Windows\NebulaData\Store\Cache`; Setup creates these folders during install so the Store never needs to write to `C:\Windows` itself. **Clear Store Cache** removes only data beneath those fixed roots. If Winget is missing, the Store says so and points at the Microsoft Store's "App Installer" package or the Chocolatey fallback. Store creates missing per-user Desktop and Start Menu shortcuts when run from an enrolled Nebula installation.
 
 `n10forceown.exe` remains the guarded native ownership tool. Explorer loads the packaged `NebulaForceOwnShell.dll` command handler so its title reflects the current selection: **ForceOwn this file**, **ForceOwn this folder**, or **ForceOwn all**. The handler passes selected paths only as quoted data arguments; ForceOwn performs its own target preview, protected-path checks, confirmation, logging, and Windows elevation. The retired SHA, Path Info, and Lock Check tools are removed during repair.
 

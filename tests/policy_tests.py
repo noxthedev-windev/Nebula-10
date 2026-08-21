@@ -18,6 +18,8 @@ service = (ROOT / "src/auth_service.cpp").read_text(encoding="utf-8")
 auth = (ROOT / "src/user_auth.cpp").read_text(encoding="utf-8")
 toolbox = (ROOT / "src/n10toolbox.cpp").read_text(encoding="utf-8")
 setup = (ROOT / "src/setup.cpp").read_text(encoding="utf-8")
+readme = (ROOT / "README.md").read_text(encoding="utf-8")
+security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
 
 assert "LONG_PATHS_ON" in service and "LONG_PATHS_OFF" in service
 assert "OEM_BRANDING_ON" in service and "OEM_BRANDING_OFF" in service
@@ -29,6 +31,7 @@ for tui_contract in ("MenuEntry", "_getwch", "UP/DOWN or W/S", "ENTER select", "
 for paging_contract in ("visibleRows", "Showing ", "more above", "more below"):
     assert paging_contract in toolbox, f"long-menu paging contract missing: {paging_contract}"
 assert "bgrt" not in toolbox.lower(), "ToolBox must not expose BGRT help, doctor, dispatch, or menu UI"
+assert "bgrt" not in (setup + readme + security).lower(), "BGRT must not appear in Setup or public docs"
 for retired_setup_surface in ("--no-bgrt", "confirm_bgrt", "installBootLogo", 'L"-install --yes"'):
     assert retired_setup_surface not in setup, f"Setup still exposes active BGRT behavior: {retired_setup_surface}"
 for copy_contract in ("CopyFileW", "MOVEFILE_DELAY_UNTIL_REBOOT", "service_stop_for_update", "Restart Windows to finish replacing"):
@@ -72,7 +75,7 @@ for setup_tools_contract in ("installed_tool_files", "verify_installed_tools", "
 for packaging_contract in ("tool_dirs", "tool_files", "chocolatey.config.backup", "currentuser.reg"):
     assert packaging_contract in package_script, f"clean fixed tool packaging contract missing: {packaging_contract}"
 store=(ROOT/"src/n10store.cpp").read_text(encoding="utf-8")
-for store_contract in (r"C:\\Windows\\NebulaData\\Store", "NEBULA_STORE_DATA_ROOT", "clear-cache", "Clear Store Cache", "--cache-location"):
+for store_contract in (r"C:\\Windows\\NebulaData\\Store", "NEBULA_STORE_DATA_ROOT", "clear-cache", "Clear Store Cache", "winget", "--provider=winget", "--provider=choco"):
     assert store_contract in store, f"Store cache/download contract missing: {store_contract}"
 for setup_selection_contract in ("InstallSelection", "--components=", "select_install_components", "Selected components"):
     assert setup_selection_contract in setup, f"Setup component selection contract missing: {setup_selection_contract}"
