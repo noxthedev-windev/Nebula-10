@@ -78,4 +78,8 @@ for updater_integrity in (r'ThemeUpdater\\Update-N10Themes.ps1', r'ThemeUpdater\
 for local_tool in ("Mem Reduct", "OpenShell", "WinXShell", "dwmblurglass", "Explorer++.exe", "ShutUp10.exe", "neofetch.exe"):
     assert local_tool.lower() in toolbox.lower(), f"ToolBox local tool missing: {local_tool}"
 assert "ToolPreferences" in toolbox and "Enabled" in toolbox, "ToolBox tool configurability missing"
+for setup_tools_contract in ("installed_tool_files", "verify_installed_tools", "remove_retired_tool_payloads"):
+    assert setup_tools_contract in setup, f"Setup managed Tools-folder contract missing: {setup_tools_contract}"
+for packaging_contract in ("tool_dirs", "tool_files", "chocolatey.config.backup", "currentuser.reg"):
+    assert packaging_contract in package_script, f"clean fixed tool packaging contract missing: {packaging_contract}"
 print("policy_tests: PASS (required files, no public BGRT, strict actions, safe launcher)")

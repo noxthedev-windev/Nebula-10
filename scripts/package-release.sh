@@ -5,6 +5,8 @@ name="Nebula10-Fix-1.1"
 stage_root="$root/dist/.package-stage"
 out="$stage_root/$name"
 tools="$root/../tools"
+tool_dirs=("choco" "Mem Reduct" "OpenShell" "WinXShell" "dwmblurglass")
+tool_files=("Explorer++.exe" "ShutUp10.exe" "neofetch.exe")
 rm -rf "$stage_root"
 rm -f "$root/dist/Nebula10-Native-2.1.0.zip" "$root/dist/Nebula10-Fix-1.0.zip"
 mkdir -p "$out/Assets" \
@@ -17,8 +19,21 @@ cp -R "$root/assets/." "$out/Assets/"
 cp "$root/assets/Wallpapers/"* "$out/OfficialThemes/Wallpapers/Nebula-Official/"
 cp "$root/assets/Themes/Icons/Nebula Official/README.txt" "$out/OfficialThemes/Icons/Nebula-Official/README.txt"
 mkdir -p "$out/Tools"
-for item in "choco" "Mem Reduct" "OpenShell" "WinXShell" "dwmblurglass"; do cp -R "$tools/$item" "$out/Tools/"; done
-for item in "Explorer++.exe" "ShutUp10.exe" "neofetch.exe"; do cp "$tools/$item" "$out/Tools/"; done
+for item in "${tool_dirs[@]}"; do
+  test -d "$tools/$item" || { echo "ERROR: reviewed tool directory missing: $tools/$item" >&2; exit 8; }
+  cp -R "$tools/$item" "$out/Tools/"
+done
+for item in "${tool_files[@]}"; do
+  test -f "$tools/$item" || { echo "ERROR: reviewed tool file missing: $tools/$item" >&2; exit 8; }
+  cp "$tools/$item" "$out/Tools/"
+done
+# Never publish mutable source-machine state or stale path-specific shortcuts.
+rm -rf "$out/Tools/choco/logs"
+rm -f "$out/Tools/choco/config/chocolatey.config.backup" \
+  "$out/Tools/OpenShell/currentuser.reg" \
+  "$out/Tools/OpenShell/localmachine.reg" \
+  "$out/Tools/OpenShell/Start Menu Settings.lnk" \
+  "$out/Tools/OpenShell/Start Screen.lnk"
 cp -R "$root/theme_catalog/scripts" "$out/ThemeUpdater"
 (cd "$stage_root" && cmake -E tar cf "../$name.zip" --format=zip "$name")
 printf 'Created %s\n' "$root/dist/$name.zip"

@@ -18,6 +18,11 @@ required=[
  "Tools/choco/choco.exe","Tools/Mem Reduct/memreduct.exe","Tools/OpenShell/StartMenu.exe",
  "Tools/WinXShell/WinXShell.exe","Tools/dwmblurglass/DWMBlurGlass.exe",
  "Tools/Explorer++.exe","Tools/ShutUp10.exe","Tools/neofetch.exe",
+ "Tools/choco/LICENSE.txt","Tools/choco/config/chocolatey.config",
+ "Tools/Mem Reduct/License.txt","Tools/OpenShell/StartMenuDLL.dll",
+ "Tools/OpenShell/OpenShellReadme.rtf","Tools/WinXShell/WinXShell.jcfg",
+ "Tools/WinXShell/wxsStub.dll","Tools/dwmblurglass/DWMBlurGlassExt.dll",
+ "Tools/dwmblurglass/data/config.ini",
  "ThemeUpdater/Update-N10Themes.ps1","ThemeUpdater/Install-DailyUpdater.ps1",
 ]
 missing=[p for p in required if not (root/p).is_file()]
@@ -26,6 +31,12 @@ for retired in ("n10hash.exe","n10pathinfo.exe","n10locks.exe"):
  assert not (root/retired).exists(),retired
 bgrt_payloads=[p.relative_to(root) for p in root.rglob('*') if 'bgrt' in p.name.lower()]
 assert not bgrt_payloads,f"BGRT payloads must be absent from the public package: {bgrt_payloads}"
+for generated in (
+ "Tools/choco/logs", "Tools/choco/config/chocolatey.config.backup",
+ "Tools/OpenShell/currentuser.reg", "Tools/OpenShell/localmachine.reg",
+ "Tools/OpenShell/Start Menu Settings.lnk", "Tools/OpenShell/Start Screen.lnk",
+):
+ assert not (root/generated).exists(),f"mutable or machine-specific tool state leaked into package: {generated}"
 choco_env=os.environ.copy()
 for key in list(choco_env):
     if key.lower()=="chocolateyinstall": choco_env.pop(key,None)

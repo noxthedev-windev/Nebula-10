@@ -178,6 +178,22 @@ void restore_branding(){
     if(RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation",0,KEY_SET_VALUE|KEY_WOW64_64KEY,&oem)==ERROR_SUCCESS){restore_oem_value(oem,L"Manufacturer",L"Manufacturer");restore_oem_value(oem,L"Model",L"Model");RegCloseKey(oem);}RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity");RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Integrity");
 }
 std::vector<std::wstring> files(){return {L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"NebulaSetup.exe",L"verinfo.bin",L"README.md",L"SECURITY.md",L"LICENSE",L"LICENSES.md"};}
+std::vector<std::wstring> installed_tool_files(){return {
+    L"Tools\\choco\\choco.exe",L"Tools\\choco\\LICENSE.txt",L"Tools\\choco\\config\\chocolatey.config",
+    L"Tools\\Mem Reduct\\memreduct.exe",L"Tools\\Mem Reduct\\License.txt",
+    L"Tools\\OpenShell\\StartMenu.exe",L"Tools\\OpenShell\\StartMenuDLL.dll",L"Tools\\OpenShell\\OpenShellReadme.rtf",
+    L"Tools\\WinXShell\\WinXShell.exe",L"Tools\\WinXShell\\WinXShell.jcfg",L"Tools\\WinXShell\\wxsStub.dll",
+    L"Tools\\dwmblurglass\\DWMBlurGlass.exe",L"Tools\\dwmblurglass\\DWMBlurGlassExt.dll",L"Tools\\dwmblurglass\\data\\config.ini",
+    L"Tools\\Explorer++.exe",L"Tools\\ShutUp10.exe",L"Tools\\neofetch.exe"};}
+bool verify_installed_tools(const fs::path&destination){
+    bool ok=true;std::error_code ec;
+    for(const auto&relative:installed_tool_files()){
+        fs::path path=destination/relative;
+        if(!fs::is_regular_file(path,ec)||ec){std::wcerr<<L"Installed tool payload is incomplete: "<<path.wstring()<<L"\n";ok=false;}
+        ec.clear();
+    }
+    return ok;
+}
 std::vector<std::wstring> integrity_files(){auto result=files();result.push_back(L"ThemeUpdater\\Update-N10Themes.ps1");result.push_back(L"ThemeUpdater\\Install-DailyUpdater.ps1");return result;}
 void remove_retired_file_tools(const fs::path& destination){
     for(const auto*name:{L"n10hash.exe",L"n10pathinfo.exe",L"n10locks.exe"}){fs::path path=destination/name;if(DeleteFileW(path.c_str()))std::wcout<<L"Removed retired tool: "<<path.wstring()<<L"\n";else if(GetLastError()!=ERROR_FILE_NOT_FOUND)MoveFileExW(path.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);}
@@ -250,6 +266,23 @@ void schedule_tree_remove(const fs::path& root){
     for(auto it=fs::recursive_directory_iterator(root,fs::directory_options::skip_permission_denied,ec);it!=fs::recursive_directory_iterator();it.increment(ec)){if(it->is_directory())dirs.push_back(it->path());else MoveFileExW(it->path().c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);}
     std::sort(dirs.rbegin(),dirs.rend());for(const auto&d:dirs)MoveFileExW(d.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);MoveFileExW(root.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);
 }
+void remove_retired_tool_payloads(const fs::path&destination){
+    const fs::path toolsRoot=destination/L"Tools";
+    const std::vector<fs::path> retired={
+      L"optimizerNXT.exe",L"forceown-cmenu.exe",L"finaltweaks.exe",L"checkstart.exe",
+      L"parkcontrolsetup64.exe",L"processlassosetup64.exe",L"fulldiskfix.cmd",L"cmdloader.bat",
+      L"tweaks",L"skus_win",L"just-the-browser",L"programs",
+      fs::path(L"OpenShell")/L"currentuser.reg",fs::path(L"OpenShell")/L"localmachine.reg",
+      fs::path(L"OpenShell")/L"Start Menu Settings.lnk",fs::path(L"OpenShell")/L"Start Screen.lnk",
+      fs::path(L"choco")/L"config"/L"chocolatey.config.backup"};
+    for(const auto&relative:retired){
+        fs::path path=toolsRoot/relative;std::error_code ec;
+        if(!fs::exists(path,ec)||ec)continue;
+        fs::remove_all(path,ec);
+        if(ec){schedule_tree_remove(path);rebootRequired=true;}
+        else std::wcout<<L"Removed retired managed tool payload: "<<path.wstring()<<L"\n";
+    }
+}
 bool remove_legacy_bgrt(const std::wstring&destination){
     fs::path controller=fs::path(destination)/L"NebulaBGRT.exe";DWORD attributes=GetFileAttributesW(controller.c_str());
     bool controllerExists=attributes!=INVALID_FILE_ATTRIBUTES&&(attributes&FILE_ATTRIBUTE_DIRECTORY)==0;
@@ -311,6 +344,8 @@ int wmain(int argc,wchar_t**argv){
     for(const auto&file:files())ok&=copy_payload_file(fs::path(source)/file,fs::path(destination)/file);
     ok&=copy_payload_tree(fs::path(source)/L"Assets",fs::path(destination)/L"Assets");
     ok&=copy_payload_tree(fs::path(source)/L"Tools",fs::path(destination)/L"Tools");
+    remove_retired_tool_payloads(destination);
+    ok&=verify_installed_tools(destination);
     ok&=copy_payload_tree(fs::path(source)/L"ThemeUpdater",fs::path(destination)/L"ThemeUpdater");
     ok&=copy_payload_tree(fs::path(source)/L"OfficialThemes",fs::path(L"C:\\Windows\\NebulaData\\Themes"));
     remove_retired_file_tools(destination);

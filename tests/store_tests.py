@@ -2,12 +2,23 @@
 """Non-networking behavior and policy tests for native N10Store."""
 from pathlib import Path
 import hashlib
-import subprocess, sys
+import shutil, subprocess, sys, tempfile
 
 root=Path(sys.argv[1]).resolve()
 store=root/'N10Store.exe'
 assert store.is_file(),f'missing {store}'
 assert hashlib.sha256(store.read_bytes()).hexdigest()=='9ca2fcaeab4388125efa3863e79d3bc5ffa13f4621fa8617e6f9c315e352724f','preserved old N10Store.exe changed'
+
+# Chocolatey writes logs even for read-only status/version probes. When a
+# complete packaged Tools tree is supplied, exercise an isolated copy so tests
+# never mutate the staged or extracted release being validated.
+isolated=None
+if (root/'Tools/choco/choco.exe').is_file():
+    isolated=tempfile.TemporaryDirectory(prefix='nebula-store-test-')
+    isolated_root=Path(isolated.name)
+    shutil.copy2(store,isolated_root/'N10Store.exe')
+    shutil.copytree(root/'Tools/choco',isolated_root/'Tools/choco')
+    store=isolated_root/'N10Store.exe'
 
 def run(*args,code=0,input_text=None):
     p=subprocess.run([str(store),*args],input=input_text,capture_output=True,text=True,timeout=30)
@@ -43,3 +54,5 @@ assert 'N10Store.ico' in setup
 assert 'Nebula Store.lnk' in setup,'Store Desktop/Start Menu shortcuts missing'
 assert 'SetIconLocation' in setup and 'N10Store.ico' in setup
 print(f'store_tests: PASS (preserved old EXE, {len(catalog_lines)} curated packages, safe Chocolatey dry-runs)')
+if isolated is not None:
+    isolated.cleanup()

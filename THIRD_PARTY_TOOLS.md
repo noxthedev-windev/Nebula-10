@@ -27,3 +27,5 @@ Nebula Store supports only compiled-in package IDs. Package installation, upgrad
 ToolBox launches only the fixed allowlist above. Other executables and scripts from the source tools folder are intentionally not packaged or exposed because some perform broad system/security changes or lack enough provenance for a safe default distribution.
 
 Third-party tools have their own behavior and licenses. Review their documentation before redistribution or use in a production image.
+
+Packaging copies only this reviewed allowlist into the release `Tools` directory. It removes Chocolatey logs/config backups and source-machine OpenShell registry exports/shortcuts before creating the ZIP. Setup recursively installs the reviewed support trees under `C:\Program Files\Nebula10\Tools`, verifies required executables, libraries, configuration, and notices after copying, and removes only explicitly named retired managed payloads during repair.
