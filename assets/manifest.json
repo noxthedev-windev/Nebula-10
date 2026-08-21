@@ -1,0 +1,128 @@
+[
+  {
+    "file": "Branding\\installer-banner.bmp",
+    "size": [
+      493,
+      58
+    ],
+    "mode": "RGB",
+    "format": "BMP"
+  },
+  {
+    "file": "Branding\\installer-banner.png",
+    "size": [
+      493,
+      58
+    ],
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\installer-panel.bmp",
+    "size": [
+      493,
+      312
+    ],
+    "mode": "RGB",
+    "format": "BMP"
+  },
+  {
+    "file": "Branding\\installer-panel.png",
+    "size": [
+      493,
+      312
+    ],
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-emblem-1024.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-emblem-128.png",
+    "size": [
+      128,
+      128
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-emblem-256.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-emblem-512.png",
+    "size": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-emblem-64.png",
+    "size": [
+      64,
+      64
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "Branding\\Nebula-wordmark.png",
+    "size": [
+      1200,
+      300
+    ],
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  {
+    "file": "contact-sheet.jpg",
+    "size": [
+      520,
+      990
+    ],
+    "mode": "RGB",
+    "format": "JPEG"
+  },
+  {
+    "file": "Wallpapers\\Nebula-Aurora.png",
+    "size": [
+      1920,
+      1080
+    ],
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  {
+    "file": "Wallpapers\\Nebula-Midnight.png",
+    "size": [
+      1920,
+      1080
+    ],
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  {
+    "file": "Wallpapers\\Nebula-Violet.png",
+    "size": [
+      1920,
+      1080
+    ],
+    "mode": "RGB",
+    "format": "PNG"
+  }
+]

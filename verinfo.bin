@@ -1,0 +1,9 @@
+# Nebula10 version manifest. UTF-8 key=value format.
+format=NEBULA_VERINFO_V1
+mod_name=Nebula
+mod_version=2.1.0
+build_id=N10-2608-A2
+codename=Andromeda
+channel=Developer Preview
+supported_windows_builds=19044-26100
+author=NoxTheDev

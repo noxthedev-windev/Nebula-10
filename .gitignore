@@ -1,0 +1,19 @@
+# Generated build and release output
+/build/
+/dist/
+
+# IDE and local OS files
+.vscode/
+.idea/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+
+# Local logs and temporary replacement files
+*.log
+*.nebula-new
+
+# Private/local environment files
+.env
+.env.*
