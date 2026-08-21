@@ -96,7 +96,59 @@ static const Package kCatalog[] = {
     {L"wireshark", L"Wireshark", L"WiresharkFoundation.Wireshark", L"System Tools", L"Network protocol analyzer."},
     {L"windirstat", L"WinDirStat", L"WinDirStat.WinDirStat", L"System Tools", L"Visual disk-usage analyzer."},
     {L"hwinfo", L"HWiNFO", L"REALiX.HWiNFO", L"System Tools", L"Detailed hardware information and monitoring."},
-    {L"cpu-z", L"CPU-Z", L"CPUID.CPU-Z", L"System Tools", L"CPU, mainboard, and memory information."}
+    {L"cpu-z", L"CPU-Z", L"CPUID.CPU-Z", L"System Tools", L"CPU, mainboard, and memory information."},
+
+    // Expanded catalog — utilities
+    {L"sharex", L"ShareX", L"ShareX.ShareX", L"Utilities", L"Advanced screenshot, screen recording, and upload tool."},
+    {L"autohotkey", L"AutoHotkey", L"AutoHotkey.AutoHotkey", L"Utilities", L"Windows automation scripting language."},
+    {L"sumatrapdf", L"SumatraPDF", L"SumatraPDF.SumatraPDF", L"Utilities", L"Fast, lightweight PDF, eBook, and comic reader."},
+    {L"irfanview", L"IrfanView", L"IrfanSkiljan.IrfanView", L"Utilities", L"Compact and fast image viewer and converter."},
+    {L"paintnet", L"Paint.NET", L"dotPDN.PaintDotNet", L"Utilities", L"Easy image and photo editing for Windows."},
+    {L"qbittorrent", L"qBittorrent", L"qBittorrent.qBittorrent", L"Utilities", L"Free, ad-free open-source BitTorrent client."},
+    {L"wiztree", L"WizTree", L"AntibodySoftware.WizTree", L"Utilities", L"Very fast disk space analyzer using MFT data."},
+    {L"ventoy", L"Ventoy", L"Ventoy.Ventoy", L"Utilities", L"Boot multiple ISO files from one USB drive."},
+    {L"nvcleanstall", L"NVCleanstall", L"TechPowerUp.NVCleanstall", L"Utilities", L"Custom NVIDIA driver installer with bloat removal."},
+
+    // Expanded catalog — browsers/communication extras
+    {L"tor-browser", L"Tor Browser", L"TorProject.TorBrowser", L"Browsers", L"Privacy browser routing traffic through the Tor network."},
+    {L"librewolf", L"LibreWolf", L"LibreWolf.LibreWolf", L"Browsers", L"Independent hard fork of Firefox focused on privacy."},
+    {L"element", L"Element", L"Element.Element", L"Communication", L"Matrix-based secure decentralized messenger."},
+    {L"thunderbird", L"Mozilla Thunderbird", L"Mozilla.Thunderbird", L"Communication", L"Open-source email and calendar client."},
+    {L"viber", L"Viber", L"Viber.Viber", L"Communication", L"Free calls and messages across devices."},
+
+    // Expanded catalog — development
+    {L"visualstudio", L"Visual Studio Community", L"Microsoft.VisualStudio.2022.Community", L"Development", L"Full-featured free Visual Studio edition."},
+    {L"docker-desktop", L"Docker Desktop", L"Docker.DockerDesktop", L"Development", L"Containers and Kubernetes on Windows."},
+    {L"postman", L"Postman", L"Postman.Postman", L"Development", L"API platform for building and testing requests."},
+    {L"powershell", L"PowerShell", L"Microsoft.PowerShell", L"Development", L"Modern cross-platform task automation shell."},
+    {L"github-cli", L"GitHub CLI", L"GitHub.cli", L"Development", L"GitHub command line for issues, PRs, and reviews."},
+    {L"unity-hub", L"Unity Hub", L"Unity.UnityHub", L"Development", L"Unity engine project and install manager."},
+    {L"godot", L"Godot Engine", L"GodotEngine.Godot", L"Development", L"Free and open-source 2D/3D game engine."},
+    {L"sublime-text", L"Sublime Text", L"SublimeHQ.SublimeText.4", L"Development", L"Sophisticated cross-platform text editor."},
+    {L"intellij-community", L"IntelliJ IDEA Community", L"JetBrains.IntelliJIDEA.Community", L"Development", L"Free Java and Kotlin IDE from JetBrains."},
+
+    // Expanded catalog — media
+    {L"blender", L"Blender", L"BlenderFoundation.Blender", L"Media", L"Open-source 3D creation suite: modeling to VFX."},
+    {L"krita", L"Krita", L"KDE.Krita", L"Media", L"Professional free and open-source painting program."},
+    {L"inkscape", L"Inkscape", L"Inkscape.Inkscape", L"Media", L"Professional vector graphics editor."},
+    {L"calibre", L"calibre", L"calibre.calibre", L"Media", L"E-book library management and conversion."},
+    {L"foobar2000", L"foobar2000", L"PeterPawlowski.foobar2000", L"Media", L"Advanced customizable audio player."},
+    {L"kdenlive", L"Kdenlive", L"KDE.Kdenlive", L"Media", L"Open-source video editor with timeline effects."},
+    {L"mpv", L"mpv", L"mpv.net", L"Media", L"Minimalist media player based on mpv."},
+
+    // Expanded catalog — gaming
+    {L"retroarch", L"RetroArch", L"Libretro.RetroArch", L"Gaming", L"Frontend for emulators, game engines, and media players."},
+    {L"curseforge", L"CurseForge App", L"Overwolf.CurseForgeApp", L"Gaming", L"Minecraft and game mod management client."},
+    {L"osu", L"osu!", L"ppy.osu", L"Gaming", L"Free rhythm game with community beatmaps."},
+
+    // Expanded catalog — security/system tools
+    {L"wireguard", L"WireGuard", L"WireGuard.WireGuard", L"Security", L"Fast, modern, secure VPN tunnel."},
+    {L"cryptomator", L"Cryptomator", L"Cryptomator.Cryptomator", L"Security", L"Client-side encryption for your cloud files."},
+    {L"process-monitor", L"Process Monitor", L"Microsoft.Sysinternals.ProcessMonitor", L"System Tools", L"Real-time file, registry, and process activity monitor."},
+    {L"crystaldiskinfo", L"CrystalDiskInfo", L"CrystalMarkTools.CrystalDiskInfo", L"System Tools", L"HDD/SSD health and temperature monitoring."},
+    {L"crystaldiskmark", L"CrystalDiskMark", L"CrystalMarkTools.CrystalDiskMark", L"System Tools", L"Disk speed benchmarking tool."},
+    {L"fancontrol", L"FanControl", L"Rem0o.FanControl.Releases", L"System Tools", L"Highly configurable fan curve control."},
+    {L"afterburner", L"MSI Afterburner", L"Guru3D.Afterburner", L"System Tools", L"GPU overclocking, monitoring, and tuning utility."}
 };
 
 constexpr size_t kCatalogSize = sizeof(kCatalog) / sizeof(kCatalog[0]);

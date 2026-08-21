@@ -31,7 +31,16 @@ assert 'Google Chrome' in out and 'googlechrome' in out,out
 for category in ('Browsers','Utilities','Development','Media','Gaming','Communication','Security','System Tools'):
     assert category in out,category
 catalog_lines=[line for line in out.splitlines() if ' | ' in line and not line.startswith('SLUG |')]
-assert len(catalog_lines)>=40,len(catalog_lines)
+assert len(catalog_lines)>=80,len(catalog_lines)
+for expected in (
+    'ShareX','AutoHotkey','qBittorrent','SumatraPDF','IrfanView','Paint.NET','WizTree',
+    'Tor Browser','LibreWolf',
+    'Visual Studio Community','Docker Desktop','Postman','PowerShell','GitHub CLI','Unity Hub','Godot',
+    'Blender','Krita','Inkscape','calibre','foobar2000','Kdenlive',
+    'RetroArch','CurseForge','Element','WireGuard','Cryptomator',
+    'Process Monitor','CrystalDiskInfo','CrystalDiskMark','FanControl','MSI Afterburner','Ventoy',
+):
+    assert expected in out,f'missing expanded-catalog entry: {expected}'
 assert 'googlechrome' in run('info','chrome')
 assert 'Firefox' in run('search','browser')
 
