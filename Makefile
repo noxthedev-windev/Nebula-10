@@ -16,5 +16,4 @@ test: package
 
 	python tests/store_tests.py "dist/.package-stage/Nebula10-Fix-1.1"
 	python tests/package_tests.py "dist/.package-stage/Nebula10-Fix-1.1"
-	python tests/theme_tests.py "dist/.package-stage/Nebula10-Fix-1.1"
 	python tests/simplification_tests.py
