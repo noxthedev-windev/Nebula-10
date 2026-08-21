@@ -42,7 +42,12 @@ for action in ('install','upgrade','uninstall'):
     assert 'No package changes made' in out,out
 
 out=run('install','chrome','--dry-run','--yes','--provider=choco')
-assert 'choco.exe' in out and 'googlechrome' in out and '--cache-location' in out,out
+assert 'choco.exe' in out and 'googlechrome' in out,out
+# Chocolatey 2.x removed the --cache-location CLI option; cache routing must
+# happen through the ChocolateyCacheLocation environment variable instead.
+assert '--cache-location' not in out,'choco 2.x rejects --cache-location'
+out=run('upgrade','chrome','--dry-run','--yes','--provider=choco')
+assert '--cache-location' not in out,out
 out=run('install','chrome','--dry-run','--yes','--provider=winget')
 assert 'winget' in out.lower() and 'Google.Chrome' in out,out
 out=run('install','chrome','--dry-run','--yes','--provider=bogus',code=2)
@@ -78,6 +83,13 @@ assert 'winget_on_path' in store_src,'Winget availability check missing'
 assert 'Winget (App Installer) was not found' in store_src,'Winget-missing guidance missing'
 assert 'installed successfully' in store_src.lower(),'explicit install success feedback missing'
 assert 'NebulaSetup repair' in store_src,'Store data-folder recovery guidance missing'
+# Live actions must relaunch the Store itself elevated (one UAC prompt) and
+# then spawn the provider with CreateProcessW so environment overrides
+# (TEMP/TMP/ChocolateyCacheLocation) survive; ShellExecuteExW runas would
+# discard them.
+assert 'relaunch_elevated' in store_src,'self-elevation relaunch missing'
+assert 'CreateProcessW(exe.c_str()' in store_src,'provider must be spawned with inheriting environment'
+assert 'ChocolateyCacheLocation' in store_src,'choco cache env override missing'
 assert 'N10Store.exe' in setup and 'N10Store.exe' in toolbox
 assert 'N10Store.ico' in setup
 assert 'Nebula Store.lnk' in setup,'Store Desktop/Start Menu shortcuts missing'

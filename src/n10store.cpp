@@ -435,6 +435,25 @@ int setup_choco(bool dry_run){
     std::wcout<<L"Chocolatey runtime ready: "<<exe<<L"\n";return 0;
 }
 
+// Live package actions need administrator rights AND our environment
+// overrides (TEMP/TMP/ChocolateyCacheLocation). UAC-elevated processes get a
+// fresh environment, so instead of elevating choco directly we relaunch this
+// Store executable elevated with a fixed subcommand; the elevated copy then
+// spawns the provider with CreateProcessW, which inherits our environment.
+int relaunch_elevated(const std::wstring& arguments) {
+    wchar_t executable[32768]{};
+    if (!GetModuleFileNameW(nullptr, executable, 32768)) return 5;
+    const std::wstring working_directory = nebula::exe_dir();
+    SHELLEXECUTEINFOW launch{};
+    launch.cbSize = sizeof(launch); launch.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    launch.lpVerb = L"runas"; launch.lpFile = executable; launch.lpParameters = arguments.c_str();
+    launch.lpDirectory = working_directory.c_str(); launch.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&launch)) return GetLastError() == ERROR_CANCELLED ? 1223 : 5;
+    WaitForSingleObject(launch.hProcess, INFINITE); DWORD code = 1;
+    GetExitCodeProcess(launch.hProcess, &code); CloseHandle(launch.hProcess);
+    return static_cast<int>(code);
+}
+
 int run_choco(const std::vector<std::wstring>& args, bool dry_run) {
     const std::wstring exe = resolve_choco();
     if (dry_run) {
@@ -448,21 +467,25 @@ int run_choco(const std::vector<std::wstring>& args, bool dry_run) {
         return 4;
     }
     const StorePaths paths = store_paths();
-    if (!create_store_directories(paths)) return 5;
-    std::wstring parameters;for(const auto& arg:args){if(!parameters.empty())parameters+=L" ";parameters+=quote_argument(arg);}std::wstring root=exe.substr(0,exe.find_last_of(L"\\/"));wchar_t old[32768]{};DWORD oldSize=GetEnvironmentVariableW(L"ChocolateyInstall",old,32768);SetEnvironmentVariableW(L"CHOCOLATEYINSTALL",nullptr);SetEnvironmentVariableW(L"ChocolateyInstall",root.c_str());
-    ScopedEnvironment temp(L"TEMP", paths.downloads), tmp(L"TMP", paths.downloads), cache(L"ChocolateyCacheLocation", paths.cache);
-    SHELLEXECUTEINFOW launch{};launch.cbSize=sizeof(launch);launch.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC;launch.lpVerb=L"runas";launch.lpFile=exe.c_str();launch.lpParameters=parameters.c_str();launch.lpDirectory=root.c_str();launch.nShow=SW_SHOWNORMAL;
-    BOOL started=ShellExecuteExW(&launch);
-    if(oldSize&&oldSize<32768)SetEnvironmentVariableW(L"ChocolateyInstall",old);else SetEnvironmentVariableW(L"ChocolateyInstall",nullptr);
-    if (!started) {
-        DWORD error = GetLastError();
-        std::wcerr << L"Could not start bundled Chocolatey: " << windows_error(error) << L" (" << error << L")\n";
-        return error==ERROR_CANCELLED?1223:5;
+    if (!create_store_directories(paths)) {
+        std::wcerr << L"Could not create the NebulaData Store folders. Run NebulaSetup repair from the complete package.\n";
+        return 5;
     }
-    WaitForSingleObject(launch.hProcess, INFINITE);
-    DWORD exit_code = 1;
-    if (!GetExitCodeProcess(launch.hProcess, &exit_code)) exit_code = 1;
-    CloseHandle(launch.hProcess);
+    std::wstring parameters;for(const auto& arg:args){if(!parameters.empty())parameters+=L" ";parameters+=quote_argument(arg);}std::wstring root=exe.substr(0,exe.find_last_of(L"\\/"));
+    // Do NOT set ChocolateyInstall: choco 2.x derives its root from its own
+    // exe location, and pointing it at a portable copy makes choco probe the
+    // machine extensions dir and abort (exit 1) on ACL-restricted machines.
+    // Scoped overrides are visible to CreateProcessW children (they inherit
+    // this process environment) but would be discarded by ShellExecuteExW
+    // runas elevation, which is why elevation happens in relaunch_elevated.
+    ScopedEnvironment temp(L"TEMP", paths.downloads), tmp(L"TMP", paths.downloads), cache(L"ChocolateyCacheLocation", paths.cache);
+    std::wstring command=L"\""+exe+L"\" "+parameters;std::vector<wchar_t> buffer(command.begin(),command.end());buffer.push_back(0);
+    STARTUPINFOW startup{};startup.cb=sizeof(startup);
+    startup.dwFlags=STARTF_USESTDHANDLES;startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=GetStdHandle(STD_OUTPUT_HANDLE);startup.hStdError=GetStdHandle(STD_ERROR_HANDLE);
+    PROCESS_INFORMATION process{};
+    BOOL started=CreateProcessW(exe.c_str(),buffer.data(),nullptr,nullptr,TRUE,0,nullptr,root.c_str(),&startup,&process);
+    if(!started){DWORD error=GetLastError();std::wcerr<<L"Could not start bundled Chocolatey: "<<windows_error(error)<<L" ("<<error<<L")\n";return 5;}
+    WaitForSingleObject(process.hProcess,INFINITE);DWORD exit_code=1;if(!GetExitCodeProcess(process.hProcess,&exit_code))exit_code=1;CloseHandle(process.hThread);CloseHandle(process.hProcess);
     return static_cast<int>(exit_code);
 }
 
@@ -524,9 +547,23 @@ int package_action(const std::wstring& action, const Package& package, bool dry_
     }
     if(!dry_run&&!nebula::require_nebula_integrity(L"N10Store.exe"))return 8;
     const StorePaths paths = store_paths();
+    // Live actions need admin rights. Elevate this Store executable itself
+    // (one UAC prompt) with a fixed internal subcommand; the elevated copy
+    // re-enters package_action elevated, sets the cache/temp environment
+    // there, and spawns the provider with an inheriting CreateProcessW.
+    if(!dry_run && !process_is_elevated()){
+        std::wstring relaunch = L"__elevated " + action + L" " + package.slug + L" --yes";
+        if(provider==Provider::Winget)relaunch+=L" --provider=winget";
+        else if(provider==Provider::Choco)relaunch+=L" --provider=choco";
+        const int rc=relaunch_elevated(relaunch);
+        report_action_result(action, package, rc);
+        return rc;
+    }
     if(provider==Provider::Choco){
         const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"No allowlisted Chocolatey package exists for this entry.\n";return 4;}
-        std::vector<std::wstring> args = {action, id, L"-y", L"--no-progress", L"--cache-location", paths.cache};
+        // Chocolatey 2.x removed --cache-location; cache routing happens via
+        // the ChocolateyCacheLocation environment variable in run_choco.
+        std::vector<std::wstring> args = {action, id, L"-y", L"--no-progress"};
         return run_choco(args, dry_run);
     }
     std::wstring verb = action==L"uninstall" ? L"uninstall" : action==L"upgrade" ? L"upgrade" : L"install";
@@ -534,7 +571,7 @@ int package_action(const std::wstring& action, const Package& package, bool dry_
     if(provider==Provider::Auto && !dry_run && !winget_on_path()){
         const wchar_t* id=choco_id(package);if(!id){std::wcerr<<L"Winget was not found and no Chocolatey fallback exists for this entry.\n";return 4;}
         std::wcerr<<L"Winget was not found; falling back to bundled Chocolatey.\n";
-        std::vector<std::wstring> chocoArgs = {action, id, L"-y", L"--no-progress", L"--cache-location", paths.cache};
+        std::vector<std::wstring> chocoArgs = {action, id, L"-y", L"--no-progress"};
         int rc=run_choco(chocoArgs, dry_run);
         report_action_result(action, package, rc);
         return rc;
@@ -720,6 +757,17 @@ int wmain(int argc, wchar_t** argv) {
         return run_tui(dry_run,provider);
     }
     const std::wstring command = lower(positional[0]);
+    if (command == L"__elevated") {
+        // Internal: re-entry after self-elevation. Strict shape:
+        // __elevated <install|upgrade|uninstall> SLUG [--provider=...] --yes
+        if (!assume_yes || positional.size() != 3) return invalid_usage(L"Invalid elevated action request.");
+        const Package* p = find_slug(positional[2]);
+        if (!p) return invalid_usage(L"Package is not in the curated N10Store catalog: " + positional[2] + L".");
+        const std::wstring verb = lower(positional[1]);
+        if (verb != L"install" && verb != L"upgrade" && verb != L"uninstall") return invalid_usage(L"Invalid elevated action.");
+        std::wcout << L"Elevated Nebula Store session for " << p->name << L".\n";
+        return package_action(verb, *p, false, true, provider);
+    }
     if (command == L"list") {
         if (dry_run || assume_yes || positional.size() > 2) return invalid_usage(L"Usage: n10store list [category]");
         std::vector<const Package*> packages;
