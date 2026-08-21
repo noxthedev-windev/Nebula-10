@@ -29,9 +29,9 @@ void banner(const ModInfo&m,const WindowsInfo&w){
 }
 void help(){
     std::wcout<<L"NebulaSetup - terminal installer for the Nebula Windows customization pack\n"
-      L"Usage: NebulaSetup [--install|--repair|--uninstall] [--dry-run] [--no-bgrt] [--yes] [--no-pause] [--help]\n"
-      L"Install/repair deploys verinfo.bin, native tools, supported OEM branding, PATH, service, shortcuts, and the default-selected NebulaBGRT boot logo.\n"
-      L"Boot-logo installation shows a separate UEFI/BitLocker warning; --no-bgrt opts out and --yes confirms it for automation.\n"
+      L"Usage: NebulaSetup [--install|--repair|--uninstall] [--dry-run] [--no-pause] [--help]\n"
+      L"Install/repair deploys verinfo.bin, native tools, supported OEM branding, PATH, service, and shortcuts.\n"
+      L"Legacy NebulaBGRT boot integration is removed safely when detected.\n"
       L"Troubleshooting: NebulaSetup --copy-diagnostics <destination-directory> <payload-file>\n";
 }
 bool shortcut(const std::wstring& link,const std::wstring& exe,const std::wstring& args=L"",const std::wstring& icon=L""){
@@ -109,18 +109,12 @@ int configure_daily_theme_update(const std::wstring&destination,bool remove){
     std::wstring args=L"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File \""+script+L"\""+(remove?L" -Remove":L"");
     return run_wait(powershell,args);
 }
-bool set_bgrt_installed(bool installed){
-    HKEY key{};DWORD disposition{},value=installed?1u:0u;
-    if(RegCreateKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity",0,nullptr,0,KEY_SET_VALUE|KEY_WOW64_64KEY,nullptr,&key,&disposition)!=ERROR_SUCCESS)return false;
-    LONG result=RegSetValueExW(key,L"NebulaBGRTInstalled",0,REG_DWORD,reinterpret_cast<const BYTE*>(&value),sizeof(value));RegCloseKey(key);return result==ERROR_SUCCESS;
-}
 bool bgrt_installed(){return reg_dword(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity",L"NebulaBGRTInstalled",0)==1;}
-bool confirm_bgrt(bool yes){
-    std::wcout<<L"\nNebulaBGRT boot logo is selected by default.\n"
-      L"WARNING: This changes the UEFI boot chain and may trigger BitLocker/TPM recovery.\n"
-      L"Keep your BitLocker recovery key and Windows recovery media available.\n";
-    if(yes)return true;
-    std::wcout<<L"Type INSTALL to apply the Nebula boot logo, or press Enter to skip: ";std::wstring answer;std::getline(std::wcin,answer);return answer==L"INSTALL";
+bool clear_bgrt_installed_marker(){
+    HKEY key{};LONG opened=RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity",0,KEY_SET_VALUE|KEY_WOW64_64KEY,&key);
+    if(opened==ERROR_FILE_NOT_FOUND)return true;
+    if(opened!=ERROR_SUCCESS)return false;
+    LONG result=RegDeleteValueW(key,L"NebulaBGRTInstalled");RegCloseKey(key);return result==ERROR_SUCCESS||result==ERROR_FILE_NOT_FOUND;
 }
 void finish_and_pause(bool success,bool pause){
     std::wcout<<(success?L"\nFinished.\n":L"\nFinished with errors.\n");
@@ -183,7 +177,7 @@ void restore_branding(){
     HKEY oem{};
     if(RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation",0,KEY_SET_VALUE|KEY_WOW64_64KEY,&oem)==ERROR_SUCCESS){restore_oem_value(oem,L"Manufacturer",L"Manufacturer");restore_oem_value(oem,L"Model",L"Model");RegCloseKey(oem);}RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Identity");RegDeleteTreeW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Nebula10\\Integrity");
 }
-std::vector<std::wstring> files(){return {L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaBGRT.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"NebulaSetup.exe",L"verinfo.bin",L"README.md",L"SECURITY.md",L"LICENSE",L"LICENSES.md"};}
+std::vector<std::wstring> files(){return {L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"NebulaSetup.exe",L"verinfo.bin",L"README.md",L"SECURITY.md",L"LICENSE",L"LICENSES.md"};}
 std::vector<std::wstring> integrity_files(){auto result=files();result.push_back(L"ThemeUpdater\\Update-N10Themes.ps1");result.push_back(L"ThemeUpdater\\Install-DailyUpdater.ps1");return result;}
 void remove_retired_file_tools(const fs::path& destination){
     for(const auto*name:{L"n10hash.exe",L"n10pathinfo.exe",L"n10locks.exe"}){fs::path path=destination/name;if(DeleteFileW(path.c_str()))std::wcout<<L"Removed retired tool: "<<path.wstring()<<L"\n";else if(GetLastError()!=ERROR_FILE_NOT_FOUND)MoveFileExW(path.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);}
@@ -195,7 +189,7 @@ bool write_integrity_state(const fs::path& source){
     RegCloseKey(key);return ok;
 }
 std::vector<std::wstring> missing_runtime_payload(const fs::path&source){
-    const std::vector<std::wstring> required={L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaBGRT.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"verinfo.bin",L"OfficialThemes\\Wallpapers\\Nebula-Official\\Nebula-Aurora.png",L"OfficialThemes\\Icons\\Nebula-Official\\README.txt",L"ThemeUpdater\\Update-N10Themes.ps1",L"ThemeUpdater\\Install-DailyUpdater.ps1",L"Tools\\choco\\choco.exe",L"Tools\\Mem Reduct\\memreduct.exe",L"Tools\\OpenShell\\StartMenu.exe",L"Tools\\WinXShell\\WinXShell.exe",L"Tools\\dwmblurglass\\DWMBlurGlass.exe",L"Tools\\Explorer++.exe",L"Tools\\ShutUp10.exe",L"Tools\\neofetch.exe"};
+    const std::vector<std::wstring> required={L"n10ver.exe",L"n10toolbox.exe",L"n10forceown.exe",L"n10themes.exe",L"NebulaForceOwnShell.dll",L"N10Store.exe",L"NebulaUserAuth.exe",L"NebulaUserAuthService.exe",L"verinfo.bin",L"OfficialThemes\\Wallpapers\\Nebula-Official\\Nebula-Aurora.png",L"OfficialThemes\\Icons\\Nebula-Official\\README.txt",L"ThemeUpdater\\Update-N10Themes.ps1",L"ThemeUpdater\\Install-DailyUpdater.ps1",L"Tools\\choco\\choco.exe",L"Tools\\Mem Reduct\\memreduct.exe",L"Tools\\OpenShell\\StartMenu.exe",L"Tools\\WinXShell\\WinXShell.exe",L"Tools\\dwmblurglass\\DWMBlurGlass.exe",L"Tools\\Explorer++.exe",L"Tools\\ShutUp10.exe",L"Tools\\neofetch.exe"};
     std::vector<std::wstring> missing;std::error_code ec;
     for(const auto&item:required){if(!fs::is_regular_file(source/item,ec)||ec)missing.push_back(item);ec.clear();}
     return missing;
@@ -256,10 +250,33 @@ void schedule_tree_remove(const fs::path& root){
     for(auto it=fs::recursive_directory_iterator(root,fs::directory_options::skip_permission_denied,ec);it!=fs::recursive_directory_iterator();it.increment(ec)){if(it->is_directory())dirs.push_back(it->path());else MoveFileExW(it->path().c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);}
     std::sort(dirs.rbegin(),dirs.rend());for(const auto&d:dirs)MoveFileExW(d.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);MoveFileExW(root.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);
 }
+bool remove_legacy_bgrt(const std::wstring&destination){
+    fs::path controller=fs::path(destination)/L"NebulaBGRT.exe";DWORD attributes=GetFileAttributesW(controller.c_str());
+    bool controllerExists=attributes!=INVALID_FILE_ATTRIBUTES&&(attributes&FILE_ATTRIBUTE_DIRECTORY)==0;
+    bool markedInstalled=bgrt_installed();
+    if(!markedInstalled&&!controllerExists)return true;
+    if(!controllerExists){
+        std::wcerr<<L"Legacy NebulaBGRT is marked installed, but its recovery controller is missing. Nebula files were kept so boot recovery remains possible.\n";
+        return false;
+    }
+    int code=run_wait(controller.wstring(),L"-uninstall --yes");
+    if(code!=0){
+        std::wcerr<<L"Legacy NebulaBGRT uninstall failed with code "<<code<<L". Nebula files were kept so boot recovery remains possible.\n";
+        return false;
+    }
+    if(!clear_bgrt_installed_marker()){
+        std::wcerr<<L"Legacy NebulaBGRT boot path was restored, but its installed marker could not be cleared. Recovery files were kept.\n";
+        return false;
+    }
+    if(!DeleteFileW(controller.c_str())&&GetLastError()!=ERROR_FILE_NOT_FOUND){MoveFileExW(controller.c_str(),nullptr,MOVEFILE_DELAY_UNTIL_REBOOT);rebootRequired=true;}
+    fs::path legacyTree=fs::path(destination)/L"NebulaBGRT";std::error_code ec;if(fs::exists(legacyTree,ec)&&!ec){schedule_tree_remove(legacyTree);rebootRequired=true;}
+    std::wcout<<L"Legacy NebulaBGRT boot path restored and controller cleanup completed.\n";
+    return true;
+}
 }
 
 int wmain(int argc,wchar_t**argv){
-    bool dry=has_arg(argc,argv,L"--dry-run"),noBgrt=has_arg(argc,argv,L"--no-bgrt"),yes=has_arg(argc,argv,L"--yes"),noPause=has_arg(argc,argv,L"--no-pause");if(has_arg(argc,argv,L"--help")||has_arg(argc,argv,L"-h")){help();return 0;}
+    bool dry=has_arg(argc,argv,L"--dry-run"),noPause=has_arg(argc,argv,L"--no-pause");if(has_arg(argc,argv,L"--help")||has_arg(argc,argv,L"-h")){help();return 0;}
     if(has_arg(argc,argv,L"--copy-diagnostics")){
         if(argc!=4){std::wcerr<<L"Usage: NebulaSetup --copy-diagnostics <destination-directory> <payload-file>\n";return 2;}
         fs::path source=fs::path(exe_dir())/argv[3],destination=fs::path(argv[2])/argv[3];bool ok=copy_payload_file(source,destination);
@@ -270,43 +287,29 @@ int wmain(int argc,wchar_t**argv){
     ModInfo mod;WindowsInfo windows=get_windows_info();std::wstring manifest=exe_dir()+L"\\verinfo.bin",error;load_verinfo(manifest,mod,&error);banner(mod,windows);std::wstring destination=target();
     if(dry){
         std::wcout<<L"DRY-RUN "<<operation<<L"\nTarget: "<<destination<<L"\n"
-          <<L"Would "<<(uninstall?L"restore the tracked NebulaBGRT boot path, restore OEM branding, and remove":L"deploy")<<L" native applications, verinfo.bin, Nebula identity, OEM branding, service, machine PATH, Desktop and Start Menu shortcuts.\n";
+          <<L"Would first remove legacy NebulaBGRT boot integration if its installed marker or controller is present.\n"
+          <<L"Would "<<(uninstall?L"restore OEM branding and remove":L"deploy")<<L" native applications, verinfo.bin, Nebula identity, OEM branding, service, machine PATH, Desktop and Start Menu shortcuts.\n";
         if(!uninstall)std::wcout<<L"Settings OEM model: "<<settings_oem_model(mod,windows)<<L"\n";
         if(!uninstall)std::wcout<<L"Shortcuts: Nebula ToolBox and Nebula Store on Desktop and Start Menu; N10 Version remains command-line only.\nToolBox icon: Assets\\Branding\\NebulaToolBox.ico.\nStore icon: Assets\\Branding\\N10Store.ico.\n";
         std::wcout<<(uninstall?L"The daily theme-update task would be removed. Downloaded and user theme data, including C:\\Windows\\NebulaData\\Themes, would be preserved.\n":L"ForceOwn Explorer labels are dynamic: ForceOwn this file, ForceOwn this folder, and ForceOwn all.\nOfficialThemes would be refreshed into the protected official theme store at C:\\Windows\\NebulaData\\Themes without deleting downloaded or user theme data. A verified daily catalog-update task would run at 05:23.\n");
-        if(!uninstall)std::wcout<<L"NebulaBGRT boot logo: "<<(noBgrt?L"opted out with --no-bgrt":L"selected by default; explicit UEFI warning confirmation required during live install")<<L".\n";
         std::wcout<<L"No changes made.\n";finish_and_pause(true,!noPause);return 0;
     }
     if(!admin()){
-        wchar_t self[MAX_PATH]{};GetModuleFileNameW(nullptr,self,MAX_PATH);std::wstring args=L"--"+operation;if(noBgrt)args+=L" --no-bgrt";if(yes)args+=L" --yes";if(noPause)args+=L" --no-pause";auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"runas",self,args.c_str(),nullptr,SW_SHOWNORMAL));return result>32?0:5;
+        wchar_t self[MAX_PATH]{};GetModuleFileNameW(nullptr,self,MAX_PATH);std::wstring args=L"--"+operation;if(noPause)args+=L" --no-pause";auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"runas",self,args.c_str(),nullptr,SW_SHOWNORMAL));return result>32?0:5;
     }
     CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
+    if(!remove_legacy_bgrt(destination)){CoUninitialize();finish_and_pause(false,!noPause);return 7;}
     if(uninstall){
-        if(bgrt_installed()){
-            std::wstring controller=destination+L"\\NebulaBGRT.exe";int code=run_wait(controller,L"-uninstall --yes");
-            if(code!=0){std::wcerr<<L"NebulaBGRT uninstall failed with code "<<code<<L". Nebula files were kept so boot recovery remains possible.\n";CoUninitialize();return 7;}
-            set_bgrt_installed(false);std::wcout<<L"NebulaBGRT boot path restored.\n";
-        }
         configure_daily_theme_update(destination,true);service_remove();machine_path(destination,true);restore_branding();remove_forceown_shell_registration();remove_file_context_menus();remove_legacy_n10_shortcuts();PWSTR desktop{},programs{};
         if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop,0,nullptr,&desktop))){DeleteFileW((std::wstring(desktop)+L"\\Nebula10 Toolbox.lnk").c_str());DeleteFileW((std::wstring(desktop)+L"\\Nebula Store.lnk").c_str());CoTaskMemFree(desktop);}
         if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms,0,nullptr,&programs))){fs::remove_all(fs::path(programs)/L"Nebula10");CoTaskMemFree(programs);}schedule_tree_remove(destination);
         std::wcout<<L"Nebula10 uninstalled; prior OEM branding restored. Downloaded and user theme data in C:\\Windows\\NebulaData\\Themes was preserved. Locked files will be removed after reboot.\n";CoUninitialize();finish_and_pause(true,!noPause);return 0;
     }
-    bool installBootLogo=false;
-    if(!noBgrt){
-        BitLockerProtection protection=query_system_drive_bitlocker();
-        if(protection==BitLockerProtection::ProtectionOn)std::wcout<<L"NebulaBGRT blocked before EFI mutation: BitLocker protection is enabled. Use --no-bgrt or suspend BitLocker deliberately after confirming your recovery key.\n";
-        else if(protection==BitLockerProtection::Unknown)std::wcout<<L"NebulaBGRT blocked before EFI mutation: BitLocker status could not be verified safely. Use --no-bgrt to install the rest of Nebula10.\n";
-        else installBootLogo=confirm_bgrt(yes);
-    }
-    if(noBgrt)std::wcout<<L"NebulaBGRT boot logo opted out with --no-bgrt.\n";
-    else if(!installBootLogo)std::wcout<<L"NebulaBGRT boot logo skipped safely before any EFI mutation.\n";
     if(!service_stop_for_update())std::wcout<<L"UserAuth service could not be stopped; a locked service binary will be replaced after reboot.\n";
     remove_forceown_shell_registration();
     fs::create_directories(destination);auto source=exe_dir();bool ok=true;
     for(const auto&file:files())ok&=copy_payload_file(fs::path(source)/file,fs::path(destination)/file);
     ok&=copy_payload_tree(fs::path(source)/L"Assets",fs::path(destination)/L"Assets");
-    ok&=copy_payload_tree(fs::path(source)/L"NebulaBGRT",fs::path(destination)/L"NebulaBGRT");
     ok&=copy_payload_tree(fs::path(source)/L"Tools",fs::path(destination)/L"Tools");
     ok&=copy_payload_tree(fs::path(source)/L"ThemeUpdater",fs::path(destination)/L"ThemeUpdater");
     ok&=copy_payload_tree(fs::path(source)/L"OfficialThemes",fs::path(L"C:\\Windows\\NebulaData\\Themes"));
@@ -315,11 +318,6 @@ int wmain(int argc,wchar_t**argv){
     ok&=apply_branding(mod,windows);
     ok&=write_integrity_state(source);
     ok&=configure_daily_theme_update(destination,false)==0;
-    if(installBootLogo){
-        int code=run_wait(destination+L"\\NebulaBGRT.exe",L"-install --yes");
-        if(code==0){ok&=set_bgrt_installed(true);std::wcout<<L"NebulaBGRT boot logo installed.\n";}
-        else{std::wcerr<<L"NebulaBGRT boot-logo installation failed with code "<<code<<L".\n";ok=false;}
-    }
     ok&=service_install(destination);ok&=machine_path(destination,false);remove_legacy_n10_shortcuts();PWSTR desktop{},programs{};std::wstring toolboxIcon=destination+L"\\Assets\\Branding\\NebulaToolBox.ico",storeIcon=destination+L"\\Assets\\Branding\\N10Store.ico";
     if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop,0,nullptr,&desktop))){ok&=shortcut(std::wstring(desktop)+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);ok&=shortcut(std::wstring(desktop)+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(desktop);}
     if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms,0,nullptr,&programs))){std::wstring folder=std::wstring(programs)+L"\\Nebula10";fs::create_directories(folder);ok&=shortcut(folder+L"\\Nebula10 Toolbox.lnk",destination+L"\\n10toolbox.exe",L"",toolboxIcon);ok&=shortcut(folder+L"\\Nebula Store.lnk",destination+L"\\N10Store.exe",L"",storeIcon);CoTaskMemFree(programs);}

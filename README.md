@@ -1,8 +1,6 @@
 # Nebula10 Native 2.1 — Fix Version 1.1
 
-**Fix Version 1.0** moves NebulaBGRT runtime logs out of the protected Program Files payload directory. Logs are written to `%ProgramData%\Nebula10\NebulaBGRT\setup-log.txt`, with a non-throwing `%TEMP%\Nebula10\NebulaBGRT` fallback before elevation. Logging failures can no longer crash install, disable, or uninstall operations.
-
-**Fix Version 1.1** adds N10Store, configurable local tools, Store shortcuts, integrity checks, and fail-closed NebulaBGRT BitLocker preflight.
+**Fix Version 1.1** adds N10Store, configurable local tools, Store shortcuts, and integrity checks.
 
 Nebula10 Native is a Windows 10/11 terminal customization and identity pack made by **NoxTheDev**. Its public tools are native C++17 console executables.
 
@@ -15,7 +13,6 @@ Nebula10 Native is a Windows 10/11 terminal customization and identity pack made
 - Installs the suite under `C:\Program Files\Nebula10`
 - Deploys `verinfo.bin` and the original Nebula artwork
 - Applies the Nebula version identity and supported OEM branding by default
-- Selects the NebulaBGRT boot logo by default, then requires a separate typed UEFI/BitLocker risk confirmation before changing the boot chain
 - Registers a supported Settings/About OEM manufacturer (`NoxTheDev`) and model string without `Windows` in the Nebula product name, such as:
 
 ```text
@@ -37,22 +34,10 @@ Preview without changes:
 NebulaSetup.exe --install --dry-run
 ```
 
-Opt out of the boot-logo component while keeping Nebula identity and OEM branding:
-
-```bat
-NebulaSetup.exe --install --no-bgrt
-```
-
-For controlled automated deployment, `--yes` confirms the already default-selected boot-logo warning:
-
-```bat
-NebulaSetup.exe --install --yes
-```
-
 When Setup completes in a real console it prints `Finished.` and waits at `Press Enter to close...`, so the result remains visible. Scripted deployments can disable that pause:
 
 ```bat
-NebulaSetup.exe --install --yes --no-pause
+NebulaSetup.exe --install --no-pause
 ```
 
 Install or remove:
@@ -62,8 +47,6 @@ NebulaSetup.exe --install
 NebulaSetup.exe --repair
 NebulaSetup.exe --uninstall
 ```
-
-When Setup successfully installs NebulaBGRT it records that state. Uninstall restores the Windows boot path first; if BGRT restoration fails, Setup keeps the runtime files and stops rather than deleting recovery components.
 
 ### Copy diagnostics and repair
 
@@ -78,8 +61,6 @@ NebulaSetup.exe --copy-diagnostics "C:\path\to\destination" verinfo.bin
 ```
 
 On a genuine failure, Setup reports the complete source path, destination path, numeric error code, and Windows error text. Extract the ZIP before installation; do not launch Setup from inside the compressed-folder preview.
-
-If NebulaBGRT reports `Aborting because of BitLocker`, the normal Nebula files/OEM branding and the boot-logo operation are separate issues. Do not disable or suspend BitLocker automatically. Press Enter at the boot-logo confirmation to skip it, finish the core installation, retain your recovery key, and configure NebulaBGRT separately only after making an informed BitLocker/recovery decision.
 
 ## verinfo.bin
 
@@ -135,8 +116,7 @@ Main categories:
 5. Windows Tools — Settings, Task Manager, Control Panel, Event Viewer, Services, Device Manager, installed apps, DirectX diagnostics, Resource Monitor, Computer Management, Disk Management, Registry Editor, System Information, Reliability Monitor, Performance Monitor, Environment Variables, Optional Features, Windows Security, and Power Options
 6. Maintenance — Disk Cleanup, Optimize Drives, Storage, Windows Update, System Protection, Startup Apps, Troubleshooters, Backup Settings, and System Restore
 7. Machine Features — narrow allowlisted UserAuth actions
-8. NebulaBGRT — status, install, disable, uninstall
-9. Recovery & Files — rollback, logs, assets, command help
+8. Recovery & Files — rollback, logs, assets, command help
 
 The header includes an original NEBULA ASCII logo, Nebula build ID, ToolBox version, current mode, and keyboard controls.
 
@@ -144,7 +124,7 @@ Long categories use a paged viewport with `more above`, `more below`, and `Showi
 
 ## N10Store
 
-`N10Store.exe` is a native keyboard-controlled terminal store backed by Windows Package Manager (`winget`). It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `Google.Chrome`.
+`N10Store.exe` is the preserved old keyboard-controlled terminal Store backed by the bundled Chocolatey client. It is copied from `payload/N10Store.exe` into builds and packages without recompilation or behavior changes. Its SHA-256 is `9ca2fcaeab4388125efa3863e79d3bc5ffa13f4621fa8617e6f9c315e352724f`. It contains a curated catalog of browsers, utilities, development tools, media applications, gaming clients, communication apps, security tools, and system diagnostics. Google Chrome is included as `chrome` / `googlechrome`.
 
 ```bat
 N10Store
@@ -210,24 +190,6 @@ OEM_BRANDING_OFF
 
 It is not an arbitrary elevated command runner and does not replace or patch Windows `consent.exe`.
 
-## NebulaBGRT command controller
-
-Users interact only with the native command executable:
-
-```bat
-NebulaBGRT -status
-NebulaBGRT -logo C:\path\logo.bmp --dry-run
-NebulaBGRT -logo C:\path\logo.bmp
-NebulaBGRT -install --dry-run
-NebulaBGRT -install
-NebulaBGRT -disable
-NebulaBGRT -uninstall
-```
-
-There is no public BGRT setup-named EXE. The modified GPL engine is stored privately as `NebulaBGRT\Runtime\engine.exe` and is invoked only with batch command input. Complete GPL source and attribution are under `NebulaBGRT\Source`.
-
-Actual install/disable/uninstall commands require an explicit typed confirmation and may trigger genuine Windows elevation. Boot-chain changes can trigger BitLocker, TPM, Windows Hello/PIN, Secure Boot, and anti-cheat recovery. Keep recovery media and the BitLocker recovery key available.
-
 ## Build, test, and package
 
 ```sh
@@ -236,5 +198,7 @@ cmake --build build --config Release --parallel 6
 ctest --test-dir build --output-on-failure
 ./scripts/package-release.sh
 ```
+
+The build copies the fixed `payload/N10Store.exe` into `build/Release`; it does not compile or replace Store behavior.
 
 Tests use only read-only and dry-run behavior. They do not install services, write the registry, change PATH, create shortcuts, change wallpaper, or modify boot configuration.

@@ -1,7 +1,3 @@
-[submodule "third_party/NebulaBGRT"]
-	path = third_party/NebulaBGRT
-	url = https://github.com/noxthedev-windev/NebulaBGRT.git
-	branch = nebula/fix-1.1
 [submodule "theme_catalog"]
 	path = theme_catalog
 	url = https://github.com/noxthedev-windev/Nebula-10-Themes.git

@@ -40,7 +40,6 @@ cases = [
  ("n10toolbox.exe", ["assets", "--dry-run"], "Assets"),
  ("n10toolbox.exe", ["logs", "--dry-run"], "Logs"),
  ("n10toolbox.exe", ["request", "LONG_PATHS_ON", "--dry-run"], "DRY-RUN"),
- ("n10toolbox.exe", ["bgrt", "status", "--dry-run"], "NebulaBGRT status"),
  ("n10toolbox.exe", ["themes", "roots"], "N10 Themes roots"),
  ("n10toolbox.exe", ["themes", "list"], "N10 Themes official packs"),
  ("n10toolbox.exe", ["themes", "update", "--dry-run"], "fixed verified Nebula-10-Themes catalog"),
@@ -54,13 +53,10 @@ cases = [
  ("N10Store.exe", ["--help"], "Usage:"),
  ("N10Store.exe", ["install", "chrome", "--dry-run", "--yes"], "No package changes made"),
  ("N10Store.exe", ["setup-choco", "--dry-run"], "Tools\\choco"),
- ("NebulaBGRT.exe", ["--help"], "-install"),
- ("NebulaBGRT.exe", ["-status"], "Payload"),
  ("NebulaUserAuth.exe", ["--help"], "No passwords"),
  ("NebulaUserAuthService.exe", ["--help"], "Strict actions"),
  ("NebulaSetup.exe", ["--help"], "Usage:"),
  ("NebulaSetup.exe", ["--install", "--dry-run"], "Finished."),
- ("NebulaSetup.exe", ["--install", "--dry-run", "--no-bgrt"], "opted out"),
  ("NebulaSetup.exe", ["--uninstall", "--dry-run"], "No changes made"),
 ]
 for exe,args,needle in cases:
@@ -69,12 +65,18 @@ for exe,args,needle in cases:
  assert p.returncode==0,(exe,args,p.returncode,out)
  assert needle in out,(exe,needle,out)
  print(f"PASS {exe} {' '.join(args)}")
+for args in (["--help"], ["doctor"]):
+ p=subprocess.run([str(b/'n10toolbox.exe'),*args],capture_output=True,text=True,timeout=15)
+ out=p.stdout+p.stderr
+ assert p.returncode==0,(args,p.returncode,out)
+ assert 'bgrt' not in out.lower(),(args,out)
 p=subprocess.run([str(b/'n10toolbox.exe'),'menu','--dry-run'],input='0\n',
                  capture_output=True,text=True,timeout=15)
 out=p.stdout+p.stderr
 assert p.returncode==0,(p.returncode,out)
 for needle in ('Main Menu','N10 Themes','Goodbye from Nebula ToolBox.'):
  assert needle in out,(needle,out)
+assert 'bgrt' not in out.lower(),out
 print('PASS n10toolbox.exe redirected menu rendering and exit')
 with tempfile.TemporaryDirectory(prefix='n10-toolbox-themes-') as td:
  root=Path(td)/'official'
@@ -86,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix='n10-toolbox-themes-') as td:
  env['NEBULA_THEME_ROOT']=str(root)
  env['NEBULA_THEME_DOCUMENTS']=str(docs)
  p=subprocess.run([str(b/'n10toolbox.exe'),'menu','--dry-run'],
-                  input='10\n5\n1\n\n0\n0\n',capture_output=True,text=True,
+                  input='9\n5\n1\n\n0\n0\n',capture_output=True,text=True,
                   timeout=15,env=env)
  out=p.stdout+p.stderr
  assert p.returncode==0,(p.returncode,out)
@@ -95,11 +97,6 @@ with tempfile.TemporaryDirectory(prefix='n10-toolbox-themes-') as td:
   assert needle in out,(needle,out)
  assert not docs.exists(),docs
 print('PASS n10toolbox.exe redirected N10 Themes pack preview')
-p=subprocess.run([str(b/'NebulaBGRT.exe'),'-safety-status'],capture_output=True,text=True,timeout=15)
-out=p.stdout+p.stderr
-assert p.returncode in (0,9,10),(p.returncode,out)
-assert 'BitLocker safety status:' in out,out
-print('PASS NebulaBGRT.exe -safety-status')
 # strict rejection happens before pipe/service access
 p=subprocess.run([str(b/'NebulaUserAuth.exe'),'CMD.EXE'],capture_output=True,text=True)
 assert p.returncode==3 and 'not allowlisted' in (p.stdout+p.stderr)

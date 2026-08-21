@@ -28,8 +28,7 @@ void help(){
       L"  maintenance <list|diskcleanup|optimize|storage|update|recovery|startup|troubleshoot|backup|restore>\n"
       L"  localtool <list|launch|enable|disable> [memreduct|openshell|winxshell|dwmblur|explorerpp|shutup10|neofetch]\n"
       L"  themes <help|roots|list|update|daily|daily-remove|select-wallpaper|select-icons> [pack]\n"
-      L"  assets, logs\n"
-      L"  bgrt <status|install|disable|uninstall>, request <allowlisted-action>\n"
+      L"  assets, logs, request <allowlisted-action>\n"
       L"Companion application: N10Store.\n"
       L"Run n10toolbox with no arguments to open the TUI.\n";
 }
@@ -73,7 +72,6 @@ int system_doctor(){
     WindowsInfo windows=get_windows_info();bool compatible=manifest&&build_supported(mod,windows);
     bool auth=path_exists(root+L"\\NebulaUserAuth.exe")&&path_exists(root+L"\\NebulaUserAuthService.exe");
     bool assets=path_exists(root+L"\\Assets\\Wallpapers");
-    bool bgrt=path_exists(root+L"\\NebulaBGRT.exe")&&path_exists(root+L"\\NebulaBGRT\\Runtime\\engine.exe")&&path_exists(root+L"\\NebulaBGRT\\Runtime\\efi-signed\\bootx64.efi");
     bool store=path_exists(root+L"\\N10Store.exe");
     bool localTools=true;for(const auto&tool:kLocalTools)localTools&=path_exists(root+L"\\"+tool.relative);
     bool service=false;SC_HANDLE manager=OpenSCManagerW(nullptr,nullptr,SC_MANAGER_CONNECT);
@@ -85,12 +83,10 @@ int system_doctor(){
     doctor_line(L"UserAuth",auth,auth?L"client and service binaries present":L"one or more binaries missing");
     doctor_line(L"Installed service",service,service?L"registered":L"not registered (normal in portable mode)");
     doctor_line(L"Assets",assets,assets?L"wallpaper pack available":L"wallpaper directory missing");
-    doctor_line(L"NebulaBGRT",bgrt,bgrt?L"controller and EFI runtime ready":L"runtime incomplete");
-
     doctor_line(L"N10Store",store,store?L"curated terminal store ready":L"N10Store.exe missing");
     doctor_line(L"Local tools",localTools,localTools?L"configured payload is complete":L"one or more local tool files are missing");
     doctor_line(L"Restart state",!reboot,reboot?L"Windows reports a pending restart":L"no common pending-restart marker");
-    bool ready=manifest&&compatible&&auth&&assets&&bgrt&&store&&localTools;
+    bool ready=manifest&&compatible&&auth&&assets&&store&&localTools;
     std::wcout<<L"Overall: "<<(ready?L"READY":L"ATTENTION NEEDED")<<L"\n";return 0;
 }
 int run_child_wait(const std::wstring& exe,const std::wstring& args=L""){
@@ -296,11 +292,6 @@ int wallpaper(const std::wstring& path,bool dry){
     DWORD a=GetFileAttributesW(path.c_str());if(a==INVALID_FILE_ATTRIBUTES||(a&FILE_ATTRIBUTE_DIRECTORY)){std::wcerr<<L"Wallpaper file not found.\n";return 2;}
     return SystemParametersInfoW(SPI_SETDESKWALLPAPER,0,const_cast<wchar_t*>(path.c_str()),SPIF_UPDATEINIFILE|SPIF_SENDCHANGE)?0:5;
 }
-int bgrt(const std::wstring& action,bool dry){
-    std::wstring exe=exe_dir()+L"\\NebulaBGRT.exe",args=L"-"+action+(dry?L" --dry-run":L"");
-    if(GetFileAttributesW(exe.c_str())==INVALID_FILE_ATTRIBUTES){std::wcerr<<L"NebulaBGRT.exe is not installed.\n";return 2;}
-    return run_child_wait(exe,args);
-}
 int dispatch(const std::vector<std::wstring>& args,bool dry){
     if(args.empty())return 2;
     const auto& c=args[0];
@@ -317,7 +308,6 @@ int dispatch(const std::vector<std::wstring>& args,bool dry){
     if(c==L"localtool")return local_tool_command(args,dry);
     if(c==L"themes")return theme_command(args,dry);
     if(c==L"assets"||c==L"logs")return open_nebula_folder(c,dry);
-    if(c==L"bgrt"&&args.size()>=2)return bgrt(args[1],dry);
     std::wcerr<<L"Unknown or incomplete command. Use --help.\n";return 2;
 }
 struct MenuEntry{std::wstring primary;std::wstring secondary;};
@@ -432,7 +422,6 @@ int run_tui(bool dry){
       {L"Windows Tools",L"Settings, consoles, devices, apps, and logs"},
       {L"Maintenance",L"Cleanup, drives, updates, and recovery"},
       {L"Machine Features",L"Narrow UserAuth service actions"},
-      {L"NebulaBGRT",L"Command-driven UEFI boot logo controller"},
       {L"Local Nebula Tools",L"Configurable tools supplied in the Nebula tools folder"},
       {L"N10 Themes",L"Official wallpaper and icon pack catalog"},
       {L"N10Store",L"Curated software store using bundled Chocolatey"},
@@ -441,7 +430,7 @@ int run_tui(bool dry){
     };
     for(;;){
         int selected=select_menu(L"Main Menu",main,dry,true);
-        if(selected<0||selected==12){std::wcout<<L"Goodbye from Nebula ToolBox.\n";return 0;}
+        if(selected<0||selected==11){std::wcout<<L"Goodbye from Nebula ToolBox.\n";return 0;}
         if(selected==0)action_menu(L"System & Identity",{{L"System Dashboard",L"Live hardware summary"},{L"N10 Version",L"Nebula and genuine Windows identity"},{L"System Doctor",L"Installation and readiness checks"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return show_info();if(i==1)return run_child_wait(exe_dir()+L"\\n10ver.exe");return system_doctor();});
         else if(selected==1)action_menu(L"Customize & Tune",{{L"Privacy Profile",L"Conservative current-user privacy"},{L"Balanced Profile",L"Conservative visual responsiveness"},{L"Power User Profile",L"Show extensions and hidden files"},{L"Wallpaper: Aurora",L"Nebula artwork"},{L"Wallpaper: Midnight",L"Nebula artwork"},{L"Wallpaper: Violet",L"Nebula artwork"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i<3)return apply_profile(i==0?L"privacy":i==1?L"balanced":L"poweruser",dry);const wchar_t* name=i==3?L"Aurora":i==4?L"Midnight":L"Violet";return wallpaper(exe_dir()+L"\\Assets\\Wallpapers\\Nebula-"+name+L".png",dry);});
         else if(selected==2)action_menu(L"Diagnostics",{{L"Summary",L"Windows, CPU, and memory"},{L"Storage",L"System-volume capacity and free space"},{L"Battery",L"Power source and charge"},{L"Display",L"Monitor and primary display mode"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* modes[]={L"summary",L"storage",L"battery",L"display"};return diagnostics(modes[i]);});
@@ -449,11 +438,10 @@ int run_tui(bool dry){
         else if(selected==4)action_menu(L"Windows Tools",{{L"Settings",L"Windows Settings"},{L"Task Manager",L"Processes and performance"},{L"Command Prompt",L"Standard user terminal"},{L"Control Panel",L"Classic settings"},{L"Event Viewer",L"System event logs"},{L"Services",L"Service management console"},{L"Device Manager",L"Hardware devices"},{L"Installed Apps",L"Apps and features"},{L"DirectX Diagnostics",L"Graphics and audio details"},{L"Resource Monitor",L"Detailed resource activity"},{L"Computer Management",L"Disks, users, tasks, and events"},{L"Disk Management",L"Volumes and partitions"},{L"Registry Editor",L"Advanced registry editor"},{L"System Information",L"Detailed hardware and OS report"},{L"Reliability Monitor",L"Stability history and failures"},{L"Performance Monitor",L"Counters and data collector sets"},{L"Environment Variables",L"User and system environment"},{L"Optional Features",L"Windows optional components"},{L"Windows Security",L"Microsoft security dashboard"},{L"Power Options",L"Power plans and sleep"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* items[]={L"settings",L"taskmgr",L"terminal",L"control",L"events",L"services",L"devices",L"apps",L"dxdiag",L"resource",L"computer",L"diskmgmt",L"registry",L"sysinfo",L"reliability",L"performance",L"environment",L"features",L"security",L"power"};return windows_tool(items[i],dry);});
         else if(selected==5)action_menu(L"Maintenance",{{L"Disk Cleanup",L"Microsoft cleanup utility"},{L"Optimize Drives",L"Microsoft drive optimizer"},{L"Storage Settings",L"Storage Sense and usage"},{L"Windows Update",L"Microsoft update page"},{L"System Protection",L"Restore points and recovery"},{L"Startup Apps",L"Programs that run at sign-in"},{L"Troubleshooters",L"Recommended and additional troubleshooters"},{L"Backup Settings",L"Windows backup configuration"},{L"System Restore",L"Launch restore-point recovery"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* items[]={L"diskcleanup",L"optimize",L"storage",L"update",L"recovery",L"startup",L"troubleshoot",L"backup",L"restore"};return maintenance_tool(items[i],dry);});
         else if(selected==6)action_menu(L"Machine Features",{{L"Enable Long Paths",L"Allowlisted machine action"},{L"Restore Long Paths",L"Restore captured original state"},{L"Apply OEM Branding",L"Allowlisted Nebula branding"},{L"Restore OEM Branding",L"Restore captured original state"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* actions[]={L"LONG_PATHS_ON",L"LONG_PATHS_OFF",L"OEM_BRANDING_ON",L"OEM_BRANDING_OFF"};return request(actions[i],dry);});
-        else if(selected==7)action_menu(L"NebulaBGRT",{{L"Status",L"Firmware and payload readiness"},{L"Install",L"Requires explicit boot-risk confirmation"},{L"Disable",L"Restore Windows boot path"},{L"Uninstall",L"Remove NebulaBGRT EFI files"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){const wchar_t* actions[]={L"status",L"install",L"disable",L"uninstall"};return bgrt(actions[i],dry);});
-        else if(selected==8)local_tools_tui(dry);
-        else if(selected==9)themes_tui(dry);
-        else if(selected==10){run_child_wait(exe_dir()+L"\\N10Store.exe",dry?L"--dry-run":L"");}
-        else if(selected==11)action_menu(L"Recovery & Files",{{L"Rollback User Settings",L"Restore all captured HKCU values"},{L"Open Nebula Logs",L"ProgramData service logs"},{L"Open Nebula Assets",L"Wallpapers and branding"},{L"Command Help",L"All automation commands"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return rollback(dry);if(i==1)return open_nebula_folder(L"logs",dry);if(i==2)return open_nebula_folder(L"assets",dry);help();return 0;});
+        else if(selected==7)local_tools_tui(dry);
+        else if(selected==8)themes_tui(dry);
+        else if(selected==9){run_child_wait(exe_dir()+L"\\N10Store.exe",dry?L"--dry-run":L"");}
+        else if(selected==10)action_menu(L"Recovery & Files",{{L"Rollback User Settings",L"Restore all captured HKCU values"},{L"Open Nebula Logs",L"ProgramData service logs"},{L"Open Nebula Assets",L"Wallpapers and branding"},{L"Command Help",L"All automation commands"},{L"Back",L"Return to Main Menu"}},dry,[&](size_t i){if(i==0)return rollback(dry);if(i==1)return open_nebula_folder(L"logs",dry);if(i==2)return open_nebula_folder(L"assets",dry);help();return 0;});
     }
 }
 }

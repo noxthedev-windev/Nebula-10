@@ -20,7 +20,7 @@ The service permits terminal-only approval after installation because its powers
 
 Current-user settings preserve original existence, type, and data before mutation. `n10toolbox rollback` restores them. Machine ON actions save the original machine value; the matching OFF action restores it. Nebula Setup separately backs up the pre-install OEM `Manufacturer` and `Model` values before applying the Nebula identity and restores them during uninstall. The custom `HKLM\SOFTWARE\Nebula10\Identity` key contains only Nebula-owned metadata and is removed on uninstall.
 
-NebulaBGRT changes the boot chain and carries separate risks involving Secure Boot, TPM measurements, BitLocker, Windows Hello/PIN, and anti-cheat software. Setup selects the Nebula boot logo by default but still requires a separate typed confirmation after presenting those risks; `--no-bgrt` opts out. Successful installation is tracked, and uninstall restores the boot path before deleting runtime files. If restoration fails, uninstall stops and preserves recovery components. Users interact only with the native `NebulaBGRT.exe` command controller; the GPL engine is private package runtime content and no setup-named BGRT executable is exposed. Keep recovery media and recovery keys available. The normal test suite never installs services, writes settings, changes PATH/shortcuts, or modifies boot configuration.
+Legacy NebulaBGRT is no longer distributed or exposed by ToolBox. Setup retains only a guarded cleanup path for machines that previously installed it: the old installed controller must successfully restore the boot path before its recovery files can be removed. The normal test suite never installs services, writes settings, changes PATH/shortcuts, or modifies boot configuration.
 
 ## ForceOwn boundary
 
@@ -30,4 +30,4 @@ Taking ownership can break application servicing or Windows security descriptors
 
 ## N10Store boundary
 
-N10Store contains a compiled, curated mapping from short slugs to exact winget package IDs. User input cannot become an executable name, package source, or arbitrary command. Package operations call winget directly with `--exact` and `--source winget`; `--dry-run` performs no network or package action. Publisher trust, manifests, hashes, and installer behavior remain governed by Windows Package Manager and the selected third-party package publisher.
+The preserved N10Store executable contains a curated mapping from short slugs to exact Chocolatey package IDs. User input cannot become an executable name, package source, or arbitrary command. Package operations call the fixed bundled `Tools\\choco\\choco.exe`; `--dry-run` performs no network or package action. Package trust, manifests, hashes, and installer behavior remain governed by Chocolatey and the selected third-party package publisher.

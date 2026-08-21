@@ -47,24 +47,18 @@ for needle in (
 ):
     assert needle in out, (needle, out)
 
-# System Doctor must be a read-only readiness report.
+# System Doctor must be a read-only readiness report without retired BGRT UI.
 out = run("n10toolbox.exe", ["doctor"])
-for needle in ("Nebula System Doctor", "verinfo.bin", "UserAuth", "NebulaBGRT", "Overall"):
+for needle in ("Nebula System Doctor", "verinfo.bin", "UserAuth", "N10Store", "Overall"):
     assert needle in out, (needle, out)
-
-# NebulaBGRT must expose command-mode operations, not the upstream setup UI.
-out = run("NebulaBGRT.exe", ["--help"])
-for needle in ("-install", "-disable", "-uninstall", "-status", "--dry-run"):
-    assert needle in out, (needle, out)
-out = run("NebulaBGRT.exe", ["-status"])
-assert "NebulaBGRT status" in out and "Payload" in out
+assert "bgrt" not in out.lower(), out
 
 # Setup preview must include mod identity, ForceOwn shell behavior, and the
 # protected official theme store without mutating the machine.
 out = run("NebulaSetup.exe", ["--install", "--dry-run"])
 for needle in (
-    "Nebula Windows", "verinfo.bin", "OEM branding", "NebulaBGRT boot logo",
-    "selected by default", "Finished.", "Shortcuts: Nebula ToolBox and Nebula Store",
+    "Nebula Windows", "verinfo.bin", "OEM branding", "Finished.",
+    "Shortcuts: Nebula ToolBox and Nebula Store",
     "NebulaToolBox.ico", "ForceOwn this file", "ForceOwn this folder", "ForceOwn all",
     r"C:\Windows\NebulaData\Themes", "protected official theme store",
 ):
@@ -72,8 +66,6 @@ for needle in (
 settings_model = next((line for line in out.splitlines() if line.startswith("Settings OEM model")), "")
 assert settings_model.startswith("Settings OEM model: Nebula 10"), settings_model
 assert "Windows" not in settings_model, settings_model
-out = run("NebulaSetup.exe", ["--install", "--dry-run", "--no-bgrt"])
-assert "NebulaBGRT boot logo" in out and "opted out" in out
 
 # Build and Setup source contracts cover the machine-wide 64-bit Explorer
 # registration and ensure the DLL never receives the console -municode option.
@@ -81,6 +73,7 @@ cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 setup_source = (ROOT / "src/setup.cpp").read_text(encoding="utf-8")
 for needle in ("n10forceown", "n10themes", "NebulaForceOwnShell", "SHARED"):
     assert needle in cmake, (needle, cmake)
+assert "bgrt" not in cmake.lower(), "CMake must not build or install a BGRT target"
 assert "add_link_options(-municode" not in cmake, cmake
 for needle in (
     "{7E950195-94A7-4E5D-9C94-E51E8D0F94CD}",
@@ -126,4 +119,4 @@ with tempfile.TemporaryDirectory(prefix="nebula-setup-only-") as td:
         assert needle in setup_only, (needle, setup_only)
     assert "Copy failed" not in setup_only, setup_only
 
-print("feature_tests: PASS (verinfo, interactive TUI, BGRT CLI, setup identity)")
+print("feature_tests: PASS (verinfo, interactive TUI, setup identity, no BGRT surface)")
