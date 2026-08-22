@@ -115,7 +115,6 @@ static const Package kCatalog[] = {
     {L"bandizip", L"Bandizip", L"Bandisoft.Bandizip", L"Utilities", L"Fast all-format archiver."},
     {L"fastcopy", L"FastCopy", L"FastCopyLab.FastCopy", L"Utilities", L"Fastest file copy and delete utility."},
     {L"lightbulb", L"LightBulb", L"Tyrrrz.LightBulb", L"Utilities", L"Screen warmth reducer for evening use."},
-    {L"flux", L"f.lux", L"FluxSoftware.Flux", L"Utilities", L"Adaptive screen color for better sleep."},
     {L"autoit", L"AutoIt", L"AutoIt.AutoIt", L"Utilities", L"Windows GUI automation scripting tool."},
     {L"quicklook", L"QuickLook", L"QL-Win.QuickLook", L"Utilities", L"macOS-style Spacebar file preview."},
 
@@ -123,12 +122,12 @@ static const Package kCatalog[] = {
     {L"tor-browser", L"Tor Browser", L"TorProject.TorBrowser", L"Browsers", L"Privacy browser routing traffic through the Tor network."},
     {L"librewolf", L"LibreWolf", L"LibreWolf.LibreWolf", L"Browsers", L"Independent hard fork of Firefox focused on privacy."},
     {L"opera-gx", L"Opera GX", L"Opera.OperaGX", L"Browsers", L"Gamer-focused browser with CPU/RAM limiters."},
-    {L"waterfox", L"Waterfox", L"BrowserWorks.Waterfox", L"Browsers", L"Firefox fork emphasizing privacy and choice."},
+    {L"waterfox", L"Waterfox", L"Waterfox.Waterfox", L"Browsers", L"Firefox fork emphasizing privacy and choice."},
     {L"element", L"Element", L"Element.Element", L"Communication", L"Matrix-based secure decentralized messenger."},
     {L"thunderbird", L"Mozilla Thunderbird", L"Mozilla.Thunderbird", L"Communication", L"Open-source email and calendar client."},
     {L"viber", L"Viber", L"Viber.Viber", L"Communication", L"Free calls and messages across devices."},
-    {L"session", L"Session", L"Oxen.Session", L"Communication", L"Private messenger with no phone numbers."},
-    {L"jitsi", L"Jitsi Meet", L"8x8.JitsiMeet", L"Communication", L"Free open-source video meetings."},
+    {L"session", L"Session", L"Session.Session", L"Communication", L"Private messenger with no phone numbers."},
+    {L"jitsi", L"Jitsi Meet", L"Jitsi.Meet", L"Communication", L"Free open-source video meetings."},
 
     // Expanded catalog — development
     {L"visualstudio", L"Visual Studio Community", L"Microsoft.VisualStudio.2022.Community", L"Development", L"Full-featured free Visual Studio edition."},
@@ -153,8 +152,6 @@ static const Package kCatalog[] = {
     {L"golang", L"Go Programming Language", L"GoLang.Go", L"Development", L"Go compiler, tools, and standard library."},
     {L"temurin-jdk", L"Eclipse Temurin JDK", L"EclipseAdoptium.Temurin.21.JDK", L"Development", L"Open Java runtime and toolkit builds."},
     {L"devtoys", L"DevToys", L"DevToys-app.DevToys", L"Development", L"Offline Swiss-army knife for developers."},
-    {L"ffmpeg", L"FFmpeg", L"Gyan.FFmpeg", L"Media", L"Complete cross-platform audio/video toolkit."},
-
     // Expanded catalog — media
     {L"blender", L"Blender", L"BlenderFoundation.Blender", L"Media", L"Open-source 3D creation suite: modeling to VFX."},
     {L"krita", L"Krita", L"KDE.Krita", L"Media", L"Professional free and open-source painting program."},
@@ -162,12 +159,10 @@ static const Package kCatalog[] = {
     {L"calibre", L"calibre", L"calibre.calibre", L"Media", L"E-book library management and conversion."},
     {L"foobar2000", L"foobar2000", L"PeterPawlowski.foobar2000", L"Media", L"Advanced customizable audio player."},
     {L"kdenlive", L"Kdenlive", L"KDE.Kdenlive", L"Media", L"Open-source video editor with timeline effects."},
-    {L"mpv", L"mpv.net", L"mpv.net", L"Media", L"Minimalist media player based on mpv."},
     {L"ytdlp", L"yt-dlp", L"yt-dlp.yt-dlp", L"Media", L"Command-line media downloader from many sites."},
     {L"imagemagick", L"ImageMagick", L"ImageMagick.ImageMagick", L"Media", L"Create, edit, and convert bitmap images."},
     {L"shotcut", L"Shotcut", L"Meltytech.Shotcut", L"Media", L"Free open-source cross-platform video editor."},
     {L"picard", L"MusicBrainz Picard", L"MusicBrainz.Picard", L"Media", L"Tag your music with acoustic fingerprints."},
-    {L"mp3tag", L"Mp3tag", L"Mp3tag.Mp3tag", L"Media", L"Powerful batch audio tag editor."},
     {L"xnviewmp", L"XnView MP", L"XnSoft.XnViewMP", L"Media", L"Image browser, converter, and organizer."},
 
     // Expanded catalog — gaming
@@ -178,8 +173,6 @@ static const Package kCatalog[] = {
     {L"ubisoft-connect", L"Ubisoft Connect", L"Ubisoft.Connect", L"Gaming", L"Ubisoft game library and rewards app."},
     {L"geforce-experience", L"NVIDIA GeForce Experience", L"Nvidia.GeForceExperience", L"Gaming", L"Driver updates, game optimization, and recording."},
     {L"logitech-ghub", L"Logitech G HUB", L"Logitech.GHUB", L"Gaming", L"Peripheral customization for Logitech G gear."},
-    {L"ds4windows", L"DS4Windows", L"Ryochan7.DS4Windows", L"Gaming", L"Use DualShock/DualSense controllers on Windows."},
-    {L"modrinth", L"Modrinth App", L"Modrinth.Modrinth", L"Gaming", L"Minecraft modpack launcher and manager."},
 
     // Expanded catalog — security/system tools
     {L"wireguard", L"WireGuard", L"WireGuard.WireGuard", L"Security", L"Fast, modern, secure VPN tunnel."},
@@ -188,7 +181,6 @@ static const Package kCatalog[] = {
     {L"protonvpn", L"Proton VPN", L"Proton.VPN", L"Security", L"Swiss privacy-focused VPN client."},
     {L"mullvad-vpn", L"Mullvad VPN", L"Mullvad.MullvadVPN", L"Security", L"Anonymous flat-rate VPN service."},
     {L"yubikey-manager", L"YubiKey Manager", L"Yubico.YubiKeyManager", L"Security", L"Configure YubiKey devices."},
-    {L"privacy-sexy", L"privacy.sexy", L"undergroundwires.privacy.sexy", L"Security", L"Transparent privacy and debloat scripting."},
     {L"eraser", L"Eraser", L"Eraser.Eraser", L"Security", L"Securely delete files beyond recovery."},
     {L"bleachbit", L"BleachBit", L"BleachBit.BleachBit", L"Security", L"Free space cleaner and privacy tool."},
     {L"process-monitor", L"Process Monitor", L"Microsoft.Sysinternals.ProcessMonitor", L"System Tools", L"Real-time file, registry, and process activity monitor."},
@@ -198,8 +190,8 @@ static const Package kCatalog[] = {
     {L"fancontrol", L"FanControl", L"Rem0o.FanControl.Releases", L"System Tools", L"Highly configurable fan curve control."},
     {L"afterburner", L"MSI Afterburner", L"Guru3D.Afterburner", L"System Tools", L"GPU overclocking, monitoring, and tuning utility."},
     {L"gpu-z", L"GPU-Z", L"TechPowerUp.GPU-Z", L"System Tools", L"Graphics card information and sensor monitor."},
-    {L"librehardwaremonitor", L"Libre Hardware Monitor", L"LibreHardwareMonitor.LibertyHardwareMonitor", L"System Tools", L"Open-source temperatures, fans, voltages monitor."},
-    {L"openrgb", L"OpenRGB", L"DarthAffe.OpenRGB", L"System Tools", L"Unified RGB lighting control across brands."},
+    {L"librehardwaremonitor", L"Libre Hardware Monitor", L"LibreHardwareMonitor.LibreHardwareMonitor", L"System Tools", L"Open-source temperatures, fans, voltages monitor."},
+    {L"openrgb", L"OpenRGB", L"OpenRGB.OpenRGB", L"System Tools", L"Unified RGB lighting control across brands."},
     {L"coretemp", L"Core Temp", L"ALCPU.CoreTemp", L"System Tools", L"Compact CPU temperature monitor."},
     {L"flow-launcher", L"Flow Launcher", L"Flow-Launcher.Flow-Launcher", L"System Tools", L"Keystroke launcher for apps and files."},
     {L"tabby", L"Tabby", L"Eugeny.Tabby", L"System Tools", L"Modern terminal with SSH and serial support."},
