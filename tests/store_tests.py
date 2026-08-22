@@ -31,7 +31,7 @@ assert 'Google Chrome' in out and 'googlechrome' in out,out
 for category in ('Browsers','Utilities','Development','Media','Gaming','Communication','Security','System Tools'):
     assert category in out,category
 catalog_lines=[line for line in out.splitlines() if ' | ' in line and not line.startswith('SLUG |')]
-assert len(catalog_lines)>=80,len(catalog_lines)
+assert len(catalog_lines)>=140,len(catalog_lines)
 for expected in (
     'ShareX','AutoHotkey','qBittorrent','SumatraPDF','IrfanView','Paint.NET','WizTree',
     'Tor Browser','LibreWolf',
@@ -39,6 +39,16 @@ for expected in (
     'Blender','Krita','Inkscape','calibre','foobar2000','Kdenlive',
     'RetroArch','CurseForge','Element','WireGuard','Cryptomator',
     'Process Monitor','CrystalDiskInfo','CrystalDiskMark','FanControl','MSI Afterburner','Ventoy',
+    'Notion','Ditto','Recuva','Bandizip','FastCopy','LightBulb','AutoIt','Obsidian','f.lux',
+    'Opera GX','Waterfox',
+    'DBeaver','MySQL Workbench','pgAdmin','MongoDB Compass','Insomnia','Fiddler','Android Studio',
+    'JetBrains Toolbox','Azure Data Studio','Rustup','Go Programming Language','Temurin JDK','DevToys',
+    'FFmpeg','yt-dlp','ImageMagick','Shotcut','Picard','Mp3tag','XnView MP',
+    'EA app','Ubisoft Connect','GeForce Experience','Logitech G HUB','DS4Windows','Modrinth App',
+    'Session','Jitsi Meet',
+    'KeePass','Proton VPN','Mullvad VPN','YubiKey Manager','privacy.sexy','Eraser','BleachBit',
+    'Sysinternals Suite','GPU-Z','Libre Hardware Monitor','OpenRGB','Core Temp','QuickLook',
+    'Flow Launcher','Tabby','PuTTY','MobaXterm','RustDesk','AnyDesk',
 ):
     assert expected in out,f'missing expanded-catalog entry: {expected}'
 assert 'googlechrome' in run('info','chrome')
